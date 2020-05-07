@@ -1,0 +1,14 @@
+*.pyc
+**/__pycache__
+.tox
+.coverage
+*.egg-info
+.venv
+venv
+dist
+build
+.eggs
+.idea
+.credentials
+.mypy_cache
+.pytest_cache
