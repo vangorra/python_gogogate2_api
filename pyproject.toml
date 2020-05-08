@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gogogate2_api"
-version = "1.0.1"
+version = "1.0.2"
 description = "Library for connecting to gogogate2 hubs"
 
 license = "MIT"
@@ -27,6 +27,7 @@ typing-extensions = ">=3.7.4.2"
 [tool.poetry.dev-dependencies]
 bandit = "==1.6.2"
 black = "==19.10b0"
+click = "==7.1.2"
 codespell = "==1.16.0"
 coverage = "==5.0.4"
 flake8 = "==3.7.8"
@@ -75,7 +76,7 @@ line_length = 88
 indent = "    "
 # by default isort don't check module indexes
 not_skip =  "__init__.py"
-# will group `import x` and `from x import` of the same module.
+# will group `import obj` and `from obj import` of the same module.
 force_sort_within_sections = true
 sections = "FUTURE,STDLIB,INBETWEENS,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
 default_section = "THIRDPARTY"

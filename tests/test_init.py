@@ -32,27 +32,9 @@ def test_activate() -> None:
     server = MockGogoGateServer("device1")
     api = GogoGate2Api(server.host, server.username, server.password)
 
-    api.clear_api_code()
-    assert api.api_code is None
-
     response = api.activate(1)
-    assert api.api_code == server.api_code
-    door1 = get_door_by_id(1, response)
-    assert door1
-    assert door1.status == DoorStatus.OPENED
-
-    api.clear_api_code()
-    assert api.api_code is None
-
-    response = api.activate(1)
-    door1 = get_door_by_id(1, response)
-    assert door1
-    assert door1.status == DoorStatus.CLOSED
-
-    with pytest.raises(ApiError) as exinfo:
-        api.activate(11)
-        assert exinfo.value.code == 5
-        assert exinfo.value.message == "Error: invalid door"
+    assert response
+    assert response.result
 
 
 @responses.activate

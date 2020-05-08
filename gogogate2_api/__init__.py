@@ -12,8 +12,10 @@ import requests
 from typing_extensions import Final
 
 from .common import (
+    ActivateResponse,
     DoorStatus,
-    GogoGate2Response,
+    InfoResponse,
+    element_to_activate_response,
     element_to_api_error,
     element_to_info_response,
     get_door_by_id,
@@ -67,7 +69,6 @@ class GogoGate2Api:
         self._password: Final = password
         self._api_url: Final = f"http://{host}/api.php"
         self._api_cipher: Final[ApiCipher] = ApiCipher(SHARED_SECRET)
-        self._api_code: Optional[str] = None
 
     def _request(
         self, action: str, arg1: Optional[str] = None, arg2: Optional[str] = None
@@ -97,36 +98,24 @@ class GogoGate2Api:
 
         return root_element
 
-    def _handle_generic_response(self, element: Element) -> GogoGate2Response:
-        response = element_to_info_response(element)
-        self._api_code = response.apicode
-        return response
-
-    @property
-    def api_code(self) -> Optional[str]:
-        """Get the current api code."""
-        return self._api_code
-
-    def clear_api_code(self) -> None:
-        """Clear the api key."""
-        self._api_code = None
-
-    def info(self) -> GogoGate2Response:
+    def info(self) -> InfoResponse:
         """Get info about the device and doors."""
-        return self._handle_generic_response(self._request("info"))
+        return element_to_info_response(self._request("info"))
 
-    def activate(self, door_id: int) -> GogoGate2Response:
+    def activate(
+        self, door_id: int, api_code: Optional[str] = None
+    ) -> ActivateResponse:
         """Send a command to open/close/stop the door.
 
         Gogogate2 does not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        if not self._api_code:
-            self.info()
+        if not api_code:
+            api_code = self.info().apicode
 
-        return self._handle_generic_response(
-            self._request("activate", str(door_id), self._api_code)
+        return element_to_activate_response(
+            self._request("activate", str(door_id), api_code)
         )
 
     def _set_door_status(self, door_id: int, door_status: DoorStatus) -> bool:
@@ -146,7 +135,7 @@ class GogoGate2Api:
         if door.status == door_status:
             return False
 
-        self.activate(door_id)
+        self.activate(door_id, response.apicode)
         return True
 
     def close_door(self, door_id: int) -> bool:

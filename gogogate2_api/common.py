@@ -164,7 +164,7 @@ class Wifi(NamedTuple):
     signal: str
 
 
-class GogoGate2Response(NamedTuple):
+class InfoResponse(NamedTuple):
     """Response from gogogate2 api calls."""
 
     user: str
@@ -181,6 +181,12 @@ class GogoGate2Response(NamedTuple):
     outputs: Outputs
     network: Network
     wifi: Wifi
+
+
+class ActivateResponse(NamedTuple):
+    """Response from gogogate2 activate calls."""
+
+    result: bool
 
 
 def element_or_none(element: Optional[Element], tag: str) -> Optional[Element]:
@@ -271,9 +277,9 @@ def door_or_raise(door_id: int, element: Element) -> Door:
     )
 
 
-def element_to_info_response(element: Element) -> GogoGate2Response:
+def element_to_info_response(element: Element) -> InfoResponse:
     """Get response from xml element."""
-    return GogoGate2Response(
+    return InfoResponse(
         user=element_text_or_raise(element, "user"),
         gogogatename=element_text_or_raise(element, "gogogatename"),
         model=element_text_or_raise(element, "model"),
@@ -292,18 +298,25 @@ def element_to_info_response(element: Element) -> GogoGate2Response:
     )
 
 
-def get_door_by_id(door_id: int, response: GogoGate2Response) -> Optional[Door]:
+def element_to_activate_response(element: Element) -> ActivateResponse:
+    """Get response from xml element."""
+    return ActivateResponse(
+        result=element_text_or_raise(element, "result").lower() == "ok"
+    )
+
+
+def get_door_by_id(door_id: int, response: InfoResponse) -> Optional[Door]:
     """Get a door from a gogogate2 response."""
     return next(
         iter([door for door in get_doors(response) if door.door_id == door_id]), None
     )
 
 
-def get_doors(response: GogoGate2Response) -> Tuple[Door, ...]:
+def get_doors(response: InfoResponse) -> Tuple[Door, ...]:
     """Get a tuple of doors from a response."""
     return (response.door1, response.door2, response.door3)
 
 
-def get_configured_doors(response: GogoGate2Response) -> Tuple[Door, ...]:
+def get_configured_doors(response: InfoResponse) -> Tuple[Door, ...]:
     """Get a tuple of configured doors from a response."""
     return tuple([door for door in get_doors(response) if door.name])

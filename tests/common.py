@@ -66,13 +66,6 @@ class MockGogoGateServer:
         """Set the status of a device."""
         self._devices[device_id]["status"] = status
 
-    # def set_device_temperature(self, device_id: int, temperature: str) -> None:
-    #     """Set a device temperature."""
-    #     if temperature is None:
-    #         del self._devices[device_id]["temperature"]
-    #     else:
-    #         self._devices[device_id]["temperature"] = temperature
-
     # pylint: disable=too-many-return-statements
     def _handle_request(self, request: Any) -> tuple:
         # Simulate an HTTP error.
@@ -120,8 +113,8 @@ class MockGogoGateServer:
         if not door["name"]:
             return self._new_response(
                 """
-                <result>OK</result>
-            """
+                    <result>OK</result>
+                """
             )
 
         current_status = door["status"]
@@ -131,7 +124,11 @@ class MockGogoGateServer:
             else DoorStatus.OPENED.value
         )
 
-        return self._info_response()
+        return self._new_response(
+            """
+                <result>OK</result>
+            """
+        )
 
     def _device_to_xml_str(self, device_id: int) -> str:
         device_dict: dict = self._devices[device_id]

@@ -1,46 +1,86 @@
-# """CLI for gogogate device."""
-# from enum import Enum
-# import pprint
-#
-# from gogogate2_api import GogoGate2Api
-#
-#
-# def isnamedtupleinstance(x):
-#     _type = type(x)
-#     bases = _type.__bases__
-#     if len(bases) != 1 or bases[0] != tuple:
-#         return False
-#     fields = getattr(_type, "_fields", None)
-#     if not isinstance(fields, tuple):
-#         return False
-#     return all(type(i) == str for i in fields)
-#
-#
-# def unpack(obj):
-#     if isinstance(obj, dict):
-#         return {key: unpack(value) for key, value in obj.items()}
-#     elif isinstance(obj, list):
-#         return [unpack(value) for value in obj]
-#     elif isnamedtupleinstance(obj):
-#         return {key: unpack(value) for key, value in obj._asdict().items()}
-#     elif isinstance(obj, tuple):
-#         return tuple(unpack(value) for value in obj)
-#     elif isinstance(obj, Enum):
-#         return obj.value
-#     else:
-#         return obj
-#
-#
-# def main() -> None:
-#     pretty_print = pprint.PrettyPrinter(indent=4)
-#     # API = GogoGate2Api("10.40.11.84", "admin", "4ZsdV9A4s0zhkp3%KoYQVXe$B$")
-#     api = GogoGate2Api("10.40.3.157", "admin", "OJa$52OaeSVA&b9W9WsR&yq!L1")
-#     # response = api.info()
-#     response = api.activate(11)
-#     # api._request("activate", 2, "FFFFF")
-#     # print('RRR', response)
-#     # print(type(unpack(response)))
-#     pretty_print.pprint(unpack(response))
-#
-#
-# main()
+#!/usr/bin/env python3
+"""CLI for gogogate device."""
+from enum import Enum
+import pprint
+from typing import Any, Optional, cast
+
+import click
+from gogogate2_api import GogoGate2Api
+
+API = "api"
+PRETTY_PRINT = pprint.PrettyPrinter(indent=4)
+
+
+def is_named_tuple(obj: Any) -> bool:
+    """Check if object is a named tuple."""
+    _type = type(obj)
+    bases = _type.__bases__
+    if len(bases) != 1 or bases[0] != tuple:
+        return False
+    fields = getattr(_type, "_fields", None)
+    if not isinstance(fields, tuple):
+        return False
+    return all(isinstance(field, str) for field in fields)
+
+
+def unpack(obj: Any) -> Any:
+    """Convert object."""
+    if isinstance(obj, dict):
+        return {key: unpack(value) for key, value in obj.items()}
+    if isinstance(obj, list):
+        return [unpack(value) for value in obj]
+    if is_named_tuple(obj):
+        return {key: unpack(value) for key, value in obj._asdict().items()}
+    if isinstance(obj, tuple):
+        return tuple(unpack(value) for value in obj)
+    if isinstance(obj, Enum):
+        return obj.value
+    return obj
+
+
+@click.group()
+@click.option("--host", required=True)
+@click.option("--username", required=True)
+@click.option("--password", required=True)
+@click.pass_context
+def cli(
+    ctx: Optional[click.core.Context] = None,
+    host: Optional[str] = None,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+) -> None:
+    """Setup api."""
+    ctx = cast(click.core.Context, ctx)
+    ctx.obj = {
+        API: GogoGate2Api(cast(str, host), cast(str, username), cast(str, password))
+    }
+
+
+@cli.command()
+@click.pass_context
+def info(ctx: click.core.Context) -> None:
+    """Get info from device."""
+    api: GogoGate2Api = ctx.obj[API]
+    PRETTY_PRINT.pprint(unpack(api.info()))
+
+
+@cli.command(name="open")
+@click.argument("door_id", type=int, required=True)
+@click.pass_context
+def open_door(ctx: click.core.Context, door_id: int) -> None:
+    """Open the door."""
+    api: GogoGate2Api = ctx.obj[API]
+    PRETTY_PRINT.pprint(unpack(api.open_door(door_id)))
+
+
+@cli.command(name="close")
+@click.argument("door_id", type=int, required=True)
+@click.pass_context
+def close_door(ctx: click.core.Context, door_id: int) -> None:
+    """Close the door."""
+    api: GogoGate2Api = ctx.obj[API]
+    PRETTY_PRINT.pprint(unpack(api.close_door(door_id)))
+
+
+if __name__ == "__main__":
+    cli()

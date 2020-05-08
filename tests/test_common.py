@@ -6,7 +6,7 @@ from gogogate2_api.common import (
     Door,
     DoorMode,
     DoorStatus,
-    GogoGate2Response,
+    InfoResponse,
     Network,
     Outputs,
     TagNotFoundException,
@@ -104,7 +104,7 @@ def test_get_enabled_doors() -> None:
         temperature=None,
     )
 
-    response = GogoGate2Response(
+    response = InfoResponse(
         user="user1",
         gogogatename="gogogatename1",
         model="",
