@@ -302,3 +302,8 @@ def get_door_by_id(door_id: int, response: GogoGate2Response) -> Optional[Door]:
 def get_doors(response: GogoGate2Response) -> Tuple[Door, ...]:
     """Get a tuple of doors from a response."""
     return (response.door1, response.door2, response.door3)
+
+
+def get_configured_doors(response: GogoGate2Response) -> Tuple[Door, ...]:
+    """Get a tuple of configured doors from a response."""
+    return tuple([door for door in get_doors(response) if door.name])
