@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 from gogogate2_api import SHARED_SECRET, ApiCipher
 from gogogate2_api.common import DoorMode, DoorStatus
+from gogogate2_api.const import ApiErrorCode
 import responses
 
 
@@ -85,30 +86,46 @@ class MockGogoGateServer:
             door_id = payload[3]
             api_code = payload[4]
         except Exception:  # pylint: disable=broad-except
-            return self._error_response(11, "Error: corrupted data")
+            return self._error_response(
+                ApiErrorCode.CORRUPTED_DATA.value, "Error: corrupted data"
+            )
 
         # Validate credentials.
         if username is None or password is None:
-            return self._error_response(2, "Error: login or password not set")
+            return self._error_response(
+                ApiErrorCode.CREDENTIALS_NOT_SET.value,
+                "Error: login or password not set",
+            )
 
         if username != self.username or password != self.password:
-            return self._error_response(1, "Error: wrong login or password")
+            return self._error_response(
+                ApiErrorCode.CREDENTIALS_INCORRECT.value,
+                "Error: wrong login or password",
+            )
 
         if command == "info":
             return self._info_response()
 
         if command != "activate":
-            return self._error_response(9, "Error: invalid option")
+            return self._error_response(
+                ApiErrorCode.INVALID_OPTION.value, "Error: invalid option"
+            )
 
         if api_code != self.api_code:
-            return self._error_response(18, "Error: invalid API code")
+            return self._error_response(
+                ApiErrorCode.INVALID_API_CODE.value, "Error: invalid API code"
+            )
 
         if not door_id.isdigit():
-            return self._error_response(8, "Error: door not set")
+            return self._error_response(
+                ApiErrorCode.DOOR_NOT_SET.value, "Error: door not set"
+            )
 
         door = self._devices.get(int(door_id))
         if not door:
-            return self._error_response(5, "Error: invalid door")
+            return self._error_response(
+                ApiErrorCode.INVALID_DOOR.value, "Error: invalid door"
+            )
 
         if not door["name"]:
             return self._new_response(
