@@ -138,7 +138,7 @@ class Door(NamedTuple):
     sensor: bool
     sensorid: Optional[str]
     camera: bool
-    events: int
+    events: Optional[int]
     temperature: Optional[float]
 
 
@@ -272,7 +272,7 @@ def door_or_raise(door_id: int, element: Element) -> Door:
         sensor=element_text_or_raise(element, "sensor").lower() == "yes",
         sensorid=element_text_or_none(element, "sensorid"),
         camera=element_text_or_raise(element, "camera").lower() == "yes",
-        events=int_or_raise(element_text_or_raise(element, "events")),
+        events=int_or_none(element_text_or_none(element, "events")),
         temperature=None if temp is None else None if temp < -100000 else temp,
     )
 
