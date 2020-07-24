@@ -21,4 +21,5 @@ jobs:
           ./scripts/build.sh
         env:
           CI: 1
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Codecov
+        uses: codecov/codecov-action@v1.0.12
