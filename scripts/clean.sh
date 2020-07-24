@@ -10,6 +10,6 @@ if [[ `env | grep VIRTUAL_ENV` ]]; then
 fi
 
 find . -regex '^.*\(__pycache__\|\.py[co]\)$' -delete
-rm .coverage .eggs .tox build dist vera*.egg-info .venv venv -rf
+rm .coverage .eggs .tox build dist *.egg-info .venv venv -rf
 
 echo "Clean complete."
