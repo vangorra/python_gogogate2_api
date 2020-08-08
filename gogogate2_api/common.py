@@ -1,16 +1,9 @@
-"""Common code for gogogate2 API."""
+"""Common code for gate APIs."""
+import dataclasses
+from dataclasses import dataclass
 from enum import Enum
-from typing import (
-    Any,
-    Callable,
-    NamedTuple,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+import json
+from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union, cast
 from xml.etree.ElementTree import Element  # nosec
 
 from typing_extensions import Final
@@ -24,7 +17,6 @@ class TagNotFoundException(Exception):
     def __init__(self, tag: str) -> None:
         """Initialize."""
         super().__init__(f"Did not find element tag '{tag}'.")
-        self.tag = tag
 
 
 class TextEmptyException(Exception):
@@ -33,7 +25,6 @@ class TextEmptyException(Exception):
     def __init__(self, tag: str) -> None:
         """Initialize."""
         super().__init__(f"Text was empty for tag '{tag}'.")
-        self.tag = tag
 
 
 class UnexpectedTypeException(Exception):
@@ -44,8 +35,6 @@ class UnexpectedTypeException(Exception):
         super().__init__(
             'Expected of "%s" to be "%s" but was "%s."' % (value, expected, type(value))
         )
-        self.value = value
-        self.expected = expected
 
 
 def enforce_type(value: Any, expected: Type[GenericType]) -> GenericType:
@@ -102,6 +91,19 @@ def float_or_none(value: Any) -> Optional[float]:
     return value_or_none(value, float)
 
 
+class EnhancedJSONEncoder(json.JSONEncoder):
+    """JSON encoder."""
+
+    # pylint: disable=method-hidden
+    def default(self, o) -> Any:  # type: ignore
+        """Encode the object."""
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        if isinstance(o, Enum):
+            return o.value
+        return super().default(o)
+
+
 class ApiError(Exception):
     """Generic API error."""
 
@@ -127,7 +129,16 @@ class DoorMode(Enum):
     ON_OFF = "onoff"
 
 
-class Door(NamedTuple):
+class RequestOption(Enum):
+    """Request option."""
+
+    INFO = "info"
+    ACTIVATE = "activate"
+
+
+@dataclass(frozen=True)
+# pylint: disable=too-many-instance-attributes
+class AbstractDoor:
     """Door object."""
 
     door_id: int
@@ -136,13 +147,28 @@ class Door(NamedTuple):
     mode: DoorMode
     status: DoorStatus
     sensor: bool
-    sensorid: Optional[str]
     camera: bool
     events: Optional[int]
+    sensorid: Optional[str]
     temperature: Optional[float]
 
 
-class Outputs(NamedTuple):
+@dataclass(frozen=True)
+class GogoGate2Door(AbstractDoor):
+    """Door object."""
+
+
+@dataclass(frozen=True)
+class ISmartGateDoor(AbstractDoor):
+    """Door object."""
+
+    enabled: bool
+    apicode: str
+    customimage: bool
+
+
+@dataclass(frozen=True)
+class Outputs:
     """Outputs object."""
 
     output1: bool
@@ -150,43 +176,84 @@ class Outputs(NamedTuple):
     output3: bool
 
 
-class Network(NamedTuple):
+@dataclass(frozen=True)
+class Network:
     """Network object."""
 
-    ip: str
+    ip: str  # pylint: disable=invalid-name
 
 
-class Wifi(NamedTuple):
+@dataclass(frozen=True)
+class Wifi:
     """Wifi object."""
 
-    SSID: Optional[str]
-    linkquality: str
-    signal: str
+    SSID: Optional[str]  # pylint: disable=invalid-name
+    linkquality: Optional[str]
+    signal: Optional[str]
 
 
-class InfoResponse(NamedTuple):
-    """Response from gogogate2 api calls."""
+@dataclass(frozen=True)
+class AbstractActivateResponse:
+    """Response from activate calls."""
+
+    result: bool
+
+
+@dataclass(frozen=True)
+class GogoGate2ActivateResponse(AbstractActivateResponse):
+    """GogoGate2 response from activate calls."""
+
+
+@dataclass(frozen=True)
+class ISmartGateActivateResponse(AbstractActivateResponse):
+    """iSmartGate response from activate calls."""
+
+
+@dataclass(frozen=True)
+# pylint: disable=too-many-instance-attributes
+class AbstractInfoResponse:
+    """Response from info calls."""
 
     user: str
-    gogogatename: str
     model: str
     apiversion: str
     remoteaccessenabled: int
     remoteaccess: str
     firmwareversion: str
-    apicode: str
-    door1: Door
-    door2: Door
-    door3: Door
-    outputs: Outputs
+
+    door1: AbstractDoor
+    door2: AbstractDoor
+    door3: AbstractDoor
+
     network: Network
     wifi: Wifi
 
 
-class ActivateResponse(NamedTuple):
-    """Response from gogogate2 activate calls."""
+@dataclass(frozen=True)
+#  pylint: disable=too-many-instance-attributes
+class GogoGate2InfoResponse(AbstractInfoResponse):
+    """Response from gogogate2 api calls."""
 
-    result: bool
+    gogogatename: str
+    apicode: str
+    door1: GogoGate2Door
+    door2: GogoGate2Door
+    door3: GogoGate2Door
+    outputs: Outputs
+
+
+@dataclass(frozen=True)
+class ISmartGateInfoResponse(AbstractInfoResponse):
+    """Response from iSmartGate info calls."""
+
+    pin: int
+    lang: str
+    ismartgatename: str
+    newfirmware: bool
+
+    door1: ISmartGateDoor
+    door2: ISmartGateDoor
+    door3: ISmartGateDoor
 
 
 def element_or_none(element: Optional[Element], tag: str) -> Optional[Element]:
@@ -196,32 +263,41 @@ def element_or_none(element: Optional[Element], tag: str) -> Optional[Element]:
 
 def element_or_raise(element: Optional[Element], tag: str) -> Element:
     """Get element from xml element."""
-    element = element_or_none(element, tag)
-    if element is None:
+    found_element: Final[Optional[Element]] = element_or_none(element, tag)
+    if found_element is None:
         raise TagNotFoundException(tag)
 
-    return element
+    return found_element
 
 
 def element_text_or_none(element: Optional[Element], tag: str) -> Optional[str]:
     """Get element text from xml element."""
-    element = element_or_none(element, tag)
+    found_element: Final[Optional[Element]] = element_or_none(element, tag)
     return (
         None
-        if element is None
+        if found_element is None
         else None
-        if element.text is None
-        else element.text.strip()
+        if found_element.text is None
+        else found_element.text.strip()
     )
 
 
 def element_text_or_raise(element: Optional[Element], tag: str) -> str:
     """Get element text from xml element."""
-    element = element_or_raise(element, tag)
-    if element.text is None:
+    found_element: Final[Element] = element_or_raise(element, tag)
+    if found_element.text is None:
         raise TextEmptyException(tag)
 
-    return element.text.strip()
+    return found_element.text.strip()
+
+
+def element_int_or_raise(element: Optional[Element], tag: str) -> int:
+    """Get element int from xml element."""
+    found_element: Final[Element] = element_or_raise(element, tag)
+    if found_element.text is None:
+        raise TextEmptyException(tag)
+
+    return int_or_raise(found_element.text.strip())
 
 
 def element_to_api_error(element: Element) -> ApiError:
@@ -236,8 +312,8 @@ def wifi_or_raise(element: Element) -> Wifi:
     """Get wifi from xml element."""
     return Wifi(
         SSID=element_text_or_none(element, "SSID"),
-        linkquality=element_text_or_raise(element, "linkquality"),
-        signal=element_text_or_raise(element, "signal"),
+        linkquality=element_text_or_none(element, "linkquality"),
+        signal=element_text_or_none(element, "signal"),
     )
 
 
@@ -255,10 +331,10 @@ def outputs_or_raise(element: Element) -> Outputs:
     )
 
 
-def door_or_raise(door_id: int, element: Element) -> Door:
+def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
     """Get door from xml element."""
     temp = float_or_none(element_text_or_none(element, "temperature"))
-    return Door(
+    return GogoGate2Door(
         door_id=door_id,
         permission=element_text_or_raise(element, "permission").lower() == "yes",
         name=element_text_or_none(element, "name"),
@@ -277,9 +353,36 @@ def door_or_raise(door_id: int, element: Element) -> Door:
     )
 
 
-def element_to_info_response(element: Element) -> InfoResponse:
+def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
+    """Get door from xml element."""
+    temp: Final[Optional[float]] = float_or_none(
+        element_text_or_none(element, "temperature")
+    )
+    return ISmartGateDoor(
+        door_id=door_id,
+        enabled=element_text_or_raise(element, "enabled").lower() == "yes",
+        apicode=element_text_or_raise(element, "apicode"),
+        customimage=element_text_or_raise(element, "customimage").lower() == "yes",
+        permission=element_text_or_raise(element, "permission").lower() == "yes",
+        name=element_text_or_none(element, "name"),
+        mode=cast(
+            DoorMode, enum_or_raise(element_text_or_raise(element, "mode"), DoorMode)
+        ),
+        status=cast(
+            DoorStatus,
+            enum_or_raise(element_text_or_raise(element, "status"), DoorStatus),
+        ),
+        sensor=element_text_or_raise(element, "sensor").lower() == "yes",
+        sensorid=element_text_or_none(element, "sensorid"),
+        camera=element_text_or_raise(element, "camera").lower() == "yes",
+        events=int_or_none(element_text_or_none(element, "events")),
+        temperature=None if temp is None else None if temp < -100000 else temp,
+    )
+
+
+def element_to_gogogate2_info_response(element: Element) -> GogoGate2InfoResponse:
     """Get response from xml element."""
-    return InfoResponse(
+    return GogoGate2InfoResponse(
         user=element_text_or_raise(element, "user"),
         gogogatename=element_text_or_raise(element, "gogogatename"),
         model=element_text_or_raise(element, "model"),
@@ -289,34 +392,69 @@ def element_to_info_response(element: Element) -> InfoResponse:
         remoteaccess=element_text_or_raise(element, "remoteaccess"),
         firmwareversion=element_text_or_raise(element, "firmwareversion"),
         apicode=element_text_or_raise(element, "apicode"),
-        door1=door_or_raise(1, element_or_raise(element, "door1")),
-        door2=door_or_raise(2, element_or_raise(element, "door2")),
-        door3=door_or_raise(3, element_or_raise(element, "door3")),
+        door1=gogogate2_door_or_raise(1, element_or_raise(element, "door1")),
+        door2=gogogate2_door_or_raise(2, element_or_raise(element, "door2")),
+        door3=gogogate2_door_or_raise(3, element_or_raise(element, "door3")),
         outputs=outputs_or_raise(element_or_raise(element, "outputs")),
         network=network_or_raise(element_or_raise(element, "network")),
         wifi=wifi_or_raise(element_or_raise(element, "wifi")),
     )
 
 
-def element_to_activate_response(element: Element) -> ActivateResponse:
+def element_to_ismartgate_info_response(element: Element) -> ISmartGateInfoResponse:
     """Get response from xml element."""
-    return ActivateResponse(
+    return ISmartGateInfoResponse(
+        user=element_text_or_raise(element, "user"),
+        pin=element_int_or_raise(element, "pin"),
+        lang=element_text_or_raise(element, "lang"),
+        ismartgatename=element_text_or_raise(element, "ismartgatename"),
+        model=element_text_or_raise(element, "model"),
+        apiversion=element_text_or_raise(element, "apiversion"),
+        remoteaccessenabled=element_text_or_raise(element, "remoteaccessenabled")
+        == "1",
+        remoteaccess=element_text_or_raise(element, "remoteaccess"),
+        firmwareversion=element_text_or_raise(element, "firmwareversion"),
+        newfirmware=element_text_or_raise(element, "newfirmware").lower() == "yes",
+        door1=ismartgate_door_or_raise(1, element_or_raise(element, "door1")),
+        door2=ismartgate_door_or_raise(2, element_or_raise(element, "door2")),
+        door3=ismartgate_door_or_raise(3, element_or_raise(element, "door3")),
+        network=network_or_raise(element_or_raise(element, "network")),
+        wifi=wifi_or_raise(element_or_raise(element, "wifi")),
+    )
+
+
+def element_to_gogogate2_activate_response(
+    element: Element,
+) -> GogoGate2ActivateResponse:
+    """Get response from xml element."""
+    return GogoGate2ActivateResponse(
         result=element_text_or_raise(element, "result").lower() == "ok"
     )
 
 
-def get_door_by_id(door_id: int, response: InfoResponse) -> Optional[Door]:
+def element_to_ismartgate_activate_response(
+    element: Element,
+) -> ISmartGateActivateResponse:
+    """Get response from xml element."""
+    return ISmartGateActivateResponse(
+        result=element_text_or_raise(element, "result").lower() == "ok"
+    )
+
+
+def get_door_by_id(
+    door_id: int, response: AbstractInfoResponse
+) -> Optional[AbstractDoor]:
     """Get a door from a gogogate2 response."""
     return next(
         iter([door for door in get_doors(response) if door.door_id == door_id]), None
     )
 
 
-def get_doors(response: InfoResponse) -> Tuple[Door, ...]:
+def get_doors(response: AbstractInfoResponse) -> Tuple[AbstractDoor, ...]:
     """Get a tuple of doors from a response."""
     return (response.door1, response.door2, response.door3)
 
 
-def get_configured_doors(response: InfoResponse) -> Tuple[Door, ...]:
+def get_configured_doors(response: AbstractInfoResponse) -> Tuple[AbstractDoor, ...]:
     """Get a tuple of configured doors from a response."""
     return tuple([door for door in get_doors(response) if door.name])

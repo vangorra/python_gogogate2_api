@@ -1,6 +1,6 @@
 VENV_DIR=".venv"
 PYTHON_BIN="python3"
-LINT_PATHS="./gogogate2_api ./tests/ ./scripts/"
+LINT_PATHS="./gogogate2_api ./tests/"
 
 function assertPython() {
   if ! [[ $(which "$PYTHON_BIN") ]]; then
