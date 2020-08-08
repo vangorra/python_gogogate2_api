@@ -11,20 +11,33 @@ from typing_extensions import Final
 GenericType = TypeVar("GenericType")
 
 
-class TagNotFoundException(Exception):
+class TagException(Exception):
+    """General exception for tags."""
+
+    def __init__(self, tag: str, message: str) -> None:
+        super().__init__(message)
+        self._tag: Final[str] = tag
+
+    @property
+    def tag(self) -> str:
+        """Get the tag."""
+        return self._tag
+
+
+class TagNotFoundException(TagException):
     """Thrown when encountering an unexpected type."""
 
     def __init__(self, tag: str) -> None:
         """Initialize."""
-        super().__init__(f"Did not find element tag '{tag}'.")
+        super().__init__(tag, f"Did not find element tag '{tag}'.")
 
 
-class TextEmptyException(Exception):
+class TextEmptyException(TagException):
     """Thrown when encountering an unexpected type."""
 
     def __init__(self, tag: str) -> None:
         """Initialize."""
-        super().__init__(f"Text was empty for tag '{tag}'.")
+        super().__init__(tag, f"Text was empty for tag '{tag}'.")
 
 
 class UnexpectedTypeException(Exception):
@@ -35,6 +48,18 @@ class UnexpectedTypeException(Exception):
         super().__init__(
             'Expected of "%s" to be "%s" but was "%s."' % (value, expected, type(value))
         )
+        self._value: Final[Any] = value
+        self._expected: Final[Type[GenericType]] = expected
+
+    @property
+    def value(self) -> Any:
+        """Get value."""
+        return self._value
+
+    @property
+    def expected(self) -> Type[GenericType]:
+        """Get expected type."""
+        return self._expected
 
 
 def enforce_type(value: Any, expected: Type[GenericType]) -> GenericType:
@@ -108,7 +133,7 @@ class ApiError(Exception):
     """Generic API error."""
 
     def __init__(self, code: int, message: str) -> None:
-        super(ApiError, self).__init__(f"Code: {code} - {message}")
+        super().__init__(f"Code: {code} - {message}")
         self._code: Final[int] = code
         self._message: Final[str] = message
 

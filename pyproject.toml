@@ -33,15 +33,15 @@ autoflake = "==1.3.1"
 bandit = "==1.6.2"
 black = "==19.10b0"
 click = "==7.1.2"
-codespell = "==1.16.0"
+codespell = "==1.17.1"
 coverage = "==5.0.4"
 dicttoxml = "==1.7.4"
 flake8 = "==3.7.8"
 isort = "==4.3.21"
 mypy = "==0.740"
-pylint = "==2.4.3"
-pytest = "==5.2.1"
-pytest-cov = "==2.8.1"
+pylint = "==2.5.3"
+pytest = "==6.0.1"
+pytest-cov = "==2.10.0"
 responses = "==0.10.6"
 toml = "==0.10.0"  # Needed by isort and others to parse this file.
 wheel = "==0.33.6"  # Needed for successful compile of other modules.
@@ -96,3 +96,35 @@ branch = true
 
 [tool.coverage.report]
 fail_under = 97.0
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--capture no --cov ./gogogate2_api --cov-report html:build/coverage_report --cov-report term --cov-report xml:build/coverage.xml"
+
+
+[tool.pylint.MASTER]
+jobs=4
+
+[tool.pylint."MESSAGES CONTROL"]
+# Reasons disabled:
+# format - handled by black
+# too-many-* - are not enforced for the sake of readability
+# too-few-* - same as too-many-*
+disable=[
+    "format",
+    "too-many-arguments",
+    "too-few-public-methods"
+]
+
+[tool.pylint.REPORTS]
+reports = false
+
+[tool.pylint.TYPECHECK]
+# For attrs
+ignored-classes="responses"
+
+[tool.pylint.FORMAT]
+expected-line-ending-format="LF"
+
+[tool.pylint.EXCEPTIONS]
+overgeneral-exceptions="Exception"

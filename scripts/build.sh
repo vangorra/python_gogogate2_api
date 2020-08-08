@@ -30,7 +30,12 @@ AUTOFLAKE_ARGS=""
 if [[ "${CI:-}" = "1" ]]; then
   AUTOFLAKE_ARGS="--check"
 fi
-autoflake $AUTOFLAKE_ARGS --in-place --recursive --remove-all-unused-imports $LINT_PATHS
+autoflake \
+  $AUTOFLAKE_ARGS \
+  --in-place \
+  --recursive \
+  --remove-all-unused-imports \
+  $LINT_PATHS
 
 
 echo
@@ -64,9 +69,11 @@ bandit \
 echo
 echo "===Lint with codespell==="
 codespell \
+  --regex "[a-zA-Z0-9-]+" \
+  --summary \
   --check-filenames \
   --ignore-words ./.codespell-ignore \
-  --skip "*/__pycache__/*" \
+  --skip "*/__pycache__/*,*/.*" \
   $LINT_PATHS
 
 
