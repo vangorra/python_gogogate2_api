@@ -17,9 +17,16 @@ from typing_extensions import Final
 
 from .common import (
     AbstractDoor,
+    ApiError,
+    CredentialsIncorrectException,
+    CredentialsNotSetException,
+    DoorNotSetException,
     DoorStatus,
+    ExceptionGenerator,
     GogoGate2ActivateResponse,
     GogoGate2InfoResponse,
+    InvalidApiCodeException,
+    InvalidOptionException,
     ISmartGateActivateResponse,
     ISmartGateDoor,
     ISmartGateInfoResponse,
@@ -31,6 +38,7 @@ from .common import (
     element_to_ismartgate_info_response,
     get_door_by_id,
 )
+from .const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 
 
 class ApiCipher:
@@ -205,7 +213,10 @@ class AbstractGateApi(
 
         error_element: Final[Optional[Element]] = root_element.find("error")
         if error_element:
-            raise element_to_api_error(error_element)
+            api_error: Final[ApiError] = element_to_api_error(error_element)
+            raise self._get_exception_map().get(api_error.code, ApiError)(
+                api_error.code, api_error.message
+            )
 
         return root_element
 
@@ -225,6 +236,11 @@ class AbstractGateApi(
     @abc.abstractmethod
     def _get_activate_api_code(self, info: InfoResponseType, door_id: int) -> str:
         """Get api code for activate actions."""
+
+    @staticmethod
+    @abc.abstractmethod
+    def _get_exception_map() -> Dict[int, ExceptionGenerator]:
+        """Return a more specific exception."""
 
     # pylint: disable=no-self-use
     def _get_extra_url_params(self) -> Dict[str, str]:
@@ -315,6 +331,17 @@ class ISmartGateApi(
 
         return cast(ISmartGateDoor, door).apicode
 
+    @staticmethod
+    def _get_exception_map() -> Dict[int, ExceptionGenerator]:
+        """Return a more specific exception."""
+        return {
+            ISmartGateApiErrorCode.CREDENTIALS_NOT_SET.value: CredentialsNotSetException,
+            ISmartGateApiErrorCode.CREDENTIALS_INCORRECT.value: CredentialsIncorrectException,
+            ISmartGateApiErrorCode.INVALID_OPTION.value: InvalidOptionException,
+            ISmartGateApiErrorCode.INVALID_API_CODE.value: InvalidApiCodeException,
+            ISmartGateApiErrorCode.DOOR_NOT_SET.value: DoorNotSetException,
+        }
+
     def _get_extra_url_params(self) -> Dict[str, str]:
         """Get extra url params when making calls."""
         return {
@@ -346,6 +373,17 @@ class GogoGate2Api(
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
         return element_to_ismartgate_activate_response(self._activate(door_id))
+
+    @staticmethod
+    def _get_exception_map() -> Dict[int, ExceptionGenerator]:
+        """Return a more specific exception."""
+        return {
+            GogoGate2ApiErrorCode.CREDENTIALS_NOT_SET.value: CredentialsNotSetException,
+            GogoGate2ApiErrorCode.CREDENTIALS_INCORRECT.value: CredentialsIncorrectException,
+            GogoGate2ApiErrorCode.INVALID_OPTION.value: InvalidOptionException,
+            GogoGate2ApiErrorCode.INVALID_API_CODE.value: InvalidApiCodeException,
+            GogoGate2ApiErrorCode.DOOR_NOT_SET.value: DoorNotSetException,
+        }
 
     # pylint: disable=unused-argument, no-self-use
     def _get_activate_api_code(self, info: GogoGate2InfoResponse, door_id: int) -> str:

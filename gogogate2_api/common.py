@@ -109,8 +109,41 @@ class ApiError(Exception):
 
     def __init__(self, code: int, message: str) -> None:
         super(ApiError, self).__init__(f"Code: {code} - {message}")
-        self.code: Final = code
-        self.message: Final = message
+        self._code: Final[int] = code
+        self._message: Final[str] = message
+
+    @property
+    def code(self) -> int:
+        """Get the error code."""
+        return self._code
+
+    @property
+    def message(self) -> str:
+        """Get the error message."""
+        return self._message
+
+
+class CredentialsNotSetException(ApiError):
+    """Credentials not set exception."""
+
+
+class CredentialsIncorrectException(ApiError):
+    """Credentials incorrect exception."""
+
+
+class InvalidOptionException(ApiError):
+    """Invalid option exception."""
+
+
+class InvalidApiCodeException(ApiError):
+    """Invalid api code exception."""
+
+
+class DoorNotSetException(ApiError):
+    """Door not set exception."""
+
+
+ExceptionGenerator = Callable[[int, str], ApiError]
 
 
 class DoorStatus(Enum):
