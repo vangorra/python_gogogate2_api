@@ -3,10 +3,10 @@ from xml.etree.ElementTree import Element  # nosec
 
 from defusedxml import ElementTree
 from gogogate2_api.common import (
-    Door,
     DoorMode,
     DoorStatus,
-    InfoResponse,
+    GogoGate2Door,
+    GogoGate2InfoResponse,
     Network,
     Outputs,
     TagNotFoundException,
@@ -20,11 +20,12 @@ from gogogate2_api.common import (
     str_or_raise,
 )
 import pytest
+from typing_extensions import Final
 
 
 def test_element_exceptions() -> None:
     """Test exceptions thrown while parsing xml elements."""
-    root_element: Element = ElementTree.fromstring(
+    root_element: Final[Element] = ElementTree.fromstring(
         """
             <response>
                 <tag1></tag1>
@@ -67,44 +68,7 @@ def test_enum_or_raise() -> None:
 
 def test_get_enabled_doors() -> None:
     """Test get configurd doors."""
-    door1 = Door(
-        door_id=1,
-        permission=True,
-        name="Door1",
-        mode=DoorMode.GARAGE,
-        status=DoorStatus.OPENED,
-        sensor=True,
-        sensorid=None,
-        camera=False,
-        events=2,
-        temperature=None,
-    )
-    door2 = Door(
-        door_id=2,
-        permission=True,
-        name=None,
-        mode=DoorMode.GARAGE,
-        status=DoorStatus.OPENED,
-        sensor=True,
-        sensorid=None,
-        camera=False,
-        events=2,
-        temperature=None,
-    )
-    door3 = Door(
-        door_id=3,
-        permission=True,
-        name="Door3",
-        mode=DoorMode.GARAGE,
-        status=DoorStatus.OPENED,
-        sensor=True,
-        sensorid=None,
-        camera=False,
-        events=2,
-        temperature=None,
-    )
-
-    response = InfoResponse(
+    response: Final[GogoGate2InfoResponse] = GogoGate2InfoResponse(
         user="user1",
         gogogatename="gogogatename1",
         model="",
@@ -113,12 +77,45 @@ def test_get_enabled_doors() -> None:
         remoteaccess="",
         firmwareversion="",
         apicode="",
-        door1=door1,
-        door2=door2,
-        door3=door3,
+        door1=GogoGate2Door(
+            door_id=1,
+            permission=True,
+            name="Door1",
+            mode=DoorMode.GARAGE,
+            status=DoorStatus.OPENED,
+            sensor=True,
+            sensorid=None,
+            camera=False,
+            events=2,
+            temperature=None,
+        ),
+        door2=GogoGate2Door(
+            door_id=2,
+            permission=True,
+            name=None,
+            mode=DoorMode.GARAGE,
+            status=DoorStatus.OPENED,
+            sensor=True,
+            sensorid=None,
+            camera=False,
+            events=2,
+            temperature=None,
+        ),
+        door3=GogoGate2Door(
+            door_id=3,
+            permission=True,
+            name="Door3",
+            mode=DoorMode.GARAGE,
+            status=DoorStatus.OPENED,
+            sensor=True,
+            sensorid=None,
+            camera=False,
+            events=2,
+            temperature=None,
+        ),
         outputs=Outputs(output1=True, output2=False, output3=True),
         network=Network(ip=""),
         wifi=Wifi(SSID="", linkquality="", signal=""),
     )
 
-    assert get_configured_doors(response) == (door1, door3)
+    assert get_configured_doors(response) == (response.door1, response.door3)

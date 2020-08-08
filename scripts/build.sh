@@ -25,6 +25,15 @@ poetry install
 
 
 echo
+echo "===Removing unused imports==="
+AUTOFLAKE_ARGS=""
+if [[ "${CI:-}" = "1" ]]; then
+  AUTOFLAKE_ARGS="--check"
+fi
+autoflake $AUTOFLAKE_ARGS --in-place --recursive --remove-all-unused-imports $LINT_PATHS
+
+
+echo
 echo "===Sorting imports==="
 ISORT_ARGS="--apply"
 if [[ "${CI:-}" = "1" ]]; then
@@ -58,7 +67,7 @@ codespell \
   --check-filenames \
   --ignore-words ./.codespell-ignore \
   --skip "*/__pycache__/*" \
-  ./gogogate2_api ./test ./scripts
+  $LINT_PATHS
 
 
 echo

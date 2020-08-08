@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "gogogate2_api"
-version = "1.0.4"
-description = "Library for connecting to gogogate2 hubs"
+version = "2.0.0"
+description = "Library for connecting to GogoGate2 and iSmartGate hubs"
 
 license = "MIT"
 
@@ -14,22 +14,28 @@ readme = 'README.md'
 repository = "https://github.com/vangorra/python_gogogate2_api"
 homepage = "https://github.com/vangorra/python_gogogate2_api"
 
-keywords = ['gogogate2', 'api']
+keywords = ['gogogate2', 'ismartgate', 'api']
+
+[tool.poetry.scripts]
+gogogate2 = "gogogate2_api.cli:gogogate2_cli"
+ismartgate = "gogogate2_api.cli:ismartgate_cli"
 
 [tool.poetry.dependencies]
-python = "^3.6 || ^3.7"
-arrow = ">=0.15.2"
+python = ">=3.6, <4"
+dataclasses = { version = "^0.7", python = "^3.6, <3.7" }
 defusedxml = ">=0.6.0"
 pycryptodomex = ">=3.9.7"
 requests = ">=2.23.0"
 typing-extensions = ">=3.7.4.2"
 
 [tool.poetry.dev-dependencies]
+autoflake = "==1.3.1"
 bandit = "==1.6.2"
 black = "==19.10b0"
 click = "==7.1.2"
 codespell = "==1.16.0"
 coverage = "==5.0.4"
+dicttoxml = "==1.7.4"
 flake8 = "==3.7.8"
 isort = "==4.3.21"
 mypy = "==0.740"
@@ -37,7 +43,7 @@ pylint = "==2.4.3"
 pytest = "==5.2.1"
 pytest-cov = "==2.8.1"
 responses = "==0.10.6"
-toml = "==0.10.0"  # Needed by isort and others.
+toml = "==0.10.0"  # Needed by isort and others to parse this file.
 wheel = "==0.33.6"  # Needed for successful compile of other modules.
 
 
