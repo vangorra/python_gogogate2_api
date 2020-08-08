@@ -34,18 +34,18 @@ def test_element_exceptions() -> None:
         """
     )
 
-    with pytest.raises(TagNotFoundException) as exinfo:
+    with pytest.raises(TagNotFoundException) as exinfo1:
         element_text_or_raise(root_element, "tag3")
-        assert exinfo.value.tag == "tag3"
+        assert exinfo1.value.tag == "tag3"
 
-    with pytest.raises(TextEmptyException) as exinfo:
+    with pytest.raises(TextEmptyException) as exinfo2:
         element_text_or_raise(root_element, "tag1")
-        assert exinfo.value.tag == "tag1"
+        assert exinfo2.value.tag == "tag1"
 
-    with pytest.raises(UnexpectedTypeException) as exinfo:
+    with pytest.raises(UnexpectedTypeException) as exinfo3:
         int_or_raise(element_text_or_raise(root_element, "tag2"))
-        assert exinfo.value.value == "value"
-        assert exinfo.value.expected == int
+        assert exinfo3.value.value == "value"
+        assert exinfo3.value.expected == int
 
 
 def test_str_or_raise() -> None:
