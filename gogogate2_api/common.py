@@ -203,6 +203,7 @@ class AbstractDoor:
     permission: bool
     name: Optional[str]
     mode: DoorMode
+    gate: bool
     status: DoorStatus
     sensor: bool
     camera: bool
@@ -396,6 +397,7 @@ def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
         door_id=door_id,
         permission=element_text_or_raise(element, "permission").lower() == "yes",
         name=element_text_or_none(element, "name"),
+        gate=False,
         mode=cast(
             DoorMode, enum_or_raise(element_text_or_raise(element, "mode"), DoorMode)
         ),
@@ -423,6 +425,7 @@ def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
         customimage=element_text_or_raise(element, "customimage").lower() == "yes",
         permission=element_text_or_raise(element, "permission").lower() == "yes",
         name=element_text_or_none(element, "name"),
+        gate=element_text_or_raise(element, "gate").lower() == "yes",
         mode=cast(
             DoorMode, enum_or_raise(element_text_or_raise(element, "mode"), DoorMode)
         ),
