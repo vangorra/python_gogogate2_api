@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gogogate2_api"
-version = "2.0.0"
+version = "2.0.1"
 description = "Library for connecting to GogoGate2 and iSmartGate hubs"
 
 license = "MIT"
