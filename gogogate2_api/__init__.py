@@ -198,7 +198,7 @@ class AbstractGateApi(
                 "data": self._cipher.encrypt(command_str),
                 **self._get_extra_url_params(),
             },
-            timeout=2,
+            timeout=5,
         )
         response_raw: Final[str] = response.content.decode("utf-8")
 
