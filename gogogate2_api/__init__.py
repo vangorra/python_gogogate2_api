@@ -8,8 +8,8 @@ from typing import Dict, Generic, Optional, TypeVar, Union, cast
 import uuid
 from xml.etree.ElementTree import Element  # nosec
 
-from Cryptodome.Cipher import AES
-from Cryptodome.Cipher._mode_cbc import CbcMode
+from Crypto.Cipher import AES  # nosec
+from Crypto.Cipher._mode_cbc import CbcMode  # nosec
 from defusedxml import ElementTree
 import requests
 from requests import Response
