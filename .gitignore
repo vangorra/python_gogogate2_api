@@ -12,3 +12,4 @@ build
 .credentials
 .mypy_cache
 .pytest_cache
+coverage.xml

@@ -24,7 +24,7 @@ ismartgate = "gogogate2_api.cli:ismartgate_cli"
 python = ">=3.6, <4"
 dataclasses = { version = "^0.7", python = "^3.6, <3.7" }
 defusedxml = ">=0.6.0"
-pycryptodomex = ">=3.9.7"
+pycryptodome = ">=3.9.7"
 requests = ">=2.23.0"
 typing-extensions = ">=3.7.4.2"
 
