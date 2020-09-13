@@ -45,6 +45,7 @@ class Command(Enum):
     OPEN = "open"
     CLOSE = "close"
     INFO = "info"
+    SENSOR = "sensor"
 
 
 @unique
@@ -119,6 +120,14 @@ def open_door(ctx: click.core.Context, door_id: int) -> None:
 def close_door(ctx: click.core.Context, door_id: int) -> None:
     """Close the door."""
     _echo_response(get_context_api(ctx).close_door(door_id))
+
+
+@cli.command(name=Command.SENSOR.value)
+@click.argument(DoorArgument.DOOR_ID.value, type=int, required=True)
+@click.pass_context
+def door_sensor(ctx: click.core.Context, door_id: int) -> None:
+    """Get door sensor data."""
+    _echo_response(get_context_api(ctx).sensor(door_id))
 
 
 def cli_with_defaults(device_type: DeviceType) -> None:

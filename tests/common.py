@@ -1,7 +1,7 @@
 """Common test code."""
 import abc
 import json
-from typing import Any, Generic, List, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 from urllib.parse import parse_qs, urlparse
 from xml.dom.minidom import parseString
 
@@ -18,9 +18,19 @@ from gogogate2_api.common import (
     Network,
     Outputs,
     RequestOption,
+    RestrictedAccessException,
+    ServicePath,
     Wifi,
+    int_or_none,
 )
-from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
+from gogogate2_api.const import (
+    LOGIN_FORM_BUTTON,
+    LOGIN_FORM_PASSWORD,
+    LOGIN_FORM_USER,
+    NONE_INT,
+    GogoGate2ApiErrorCode,
+    ISmartGateApiErrorCode,
+)
 import responses
 from typing_extensions import Final
 
@@ -29,6 +39,7 @@ MockInfoResponse = TypeVar(
 )
 
 
+# pylint: disable=too-many-instance-attributes
 class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
     """Mock server."""
 
@@ -50,12 +61,33 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         self._info_data: dict = json.loads(
             json.dumps(self._get_info_data(), indent=2, cls=EnhancedJSONEncoder)
         )
+        self._temp_data: Dict[int, Tuple[str, str]] = {
+            1: (str(23456), str(NONE_INT)),
+            2: (str(NONE_INT), str(20)),
+            3: ("", ""),
+        }
+        self._is_web_authenticated: bool = False
 
         responses.reset()
         responses.add_callback(
             responses.GET,
-            AbstractGateApi.API_URL_TEMPLATE % self.host,
-            callback=self._handle_request,
+            AbstractGateApi.service_url(self.host, ServicePath.API),
+            callback=self._handle_api_get,
+        )
+        responses.add_callback(
+            responses.GET,
+            AbstractGateApi.service_url(self.host, ServicePath.INDEX),
+            callback=self._handle_index_get,
+        )
+        responses.add_callback(
+            responses.POST,
+            AbstractGateApi.service_url(self.host, ServicePath.INDEX),
+            callback=self._handle_index_post,
+        )
+        responses.add_callback(
+            responses.GET,
+            AbstractGateApi.service_url(self.host, ServicePath.ISG_TEMPERATURE),
+            callback=self._handle_isg_temperature_get,
         )
 
     @abc.abstractmethod
@@ -102,8 +134,41 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         """Set the status of a device."""
         self._info_data[f"door{door_id}"]["status"] = door_status.value
 
+    def _handle_index_get(
+        self, request: Any  # pylint: disable=unused-argument
+    ) -> tuple:
+        self._is_web_authenticated = False
+        return (200, {}, "This always returns HTML with a HTTP 200 status code.")
+
+    def _handle_index_post(self, request: Any) -> tuple:
+        self._is_web_authenticated = False
+
+        data: Final[dict] = parse_qs(request.body)
+        if (
+            LOGIN_FORM_USER in data
+            and LOGIN_FORM_PASSWORD in data
+            and LOGIN_FORM_BUTTON in data
+        ):
+            self._is_web_authenticated = (
+                data[LOGIN_FORM_USER][0] == self.username
+                and data[LOGIN_FORM_PASSWORD][0] == self.password
+            )
+
+        return (200, {}, "This always returns HTML with a HTTP 200 status code.")
+
+    def _handle_isg_temperature_get(self, request: Any) -> tuple:
+        if not self._is_web_authenticated:
+            return (200, {}, RestrictedAccessException.RESPONSE_ERROR)
+
+        query: Final[dict] = parse_qs(urlparse(request.url).query)
+        door_id = int_or_none(query.get("door", ["0"])[0])
+        if door_id is None or door_id < 1 or door_id > 3:
+            return (200, {}, "")
+
+        return (200, {}, json.dumps(self._temp_data[door_id]))
+
     # pylint: disable=too-many-return-statements
-    def _handle_request(self, request: Any) -> tuple:
+    def _handle_api_get(self, request: Any) -> tuple:
         # Simulate an HTTP error.
         if self.http_status != 200:
             return self._new_response("")

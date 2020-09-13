@@ -4,15 +4,14 @@ import base64
 from hashlib import sha1
 import json
 import secrets
-from typing import Dict, Generic, Optional, TypeVar, Union, cast
+from typing import Any, Dict, Generic, Optional, TypeVar, Union, cast
 import uuid
 from xml.etree.ElementTree import Element  # nosec
 
 from Crypto.Cipher import AES  # nosec
 from Crypto.Cipher._mode_cbc import CbcMode  # nosec
 from defusedxml import ElementTree
-import requests
-from requests import Response
+from requests import Response, Session
 from typing_extensions import Final
 
 from .common import (
@@ -26,19 +25,30 @@ from .common import (
     GogoGate2ActivateResponse,
     GogoGate2InfoResponse,
     InvalidApiCodeException,
+    InvalidDoorException,
     InvalidOptionException,
     ISmartGateActivateResponse,
     ISmartGateDoor,
     ISmartGateInfoResponse,
     RequestOption,
+    RestrictedAccessException,
+    SensorResponse,
+    ServicePath,
     element_to_api_error,
     element_to_gogogate2_activate_response,
     element_to_gogogate2_info_response,
     element_to_ismartgate_activate_response,
     element_to_ismartgate_info_response,
     get_door_by_id,
+    list_to_sensor_response,
 )
-from .const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
+from .const import (
+    LOGIN_FORM_BUTTON,
+    LOGIN_FORM_PASSWORD,
+    LOGIN_FORM_USER,
+    GogoGate2ApiErrorCode,
+    ISmartGateApiErrorCode,
+)
 
 
 class ApiCipher:
@@ -144,7 +154,7 @@ class AbstractGateApi(
 ):
     """API capable of communicating with a gogogate2 devices."""
 
-    API_URL_TEMPLATE: Final[str] = "http://%s/api.php"
+    URL_TEMPLATE = "http://%s/%s"
 
     def __init__(
         self, host: str, username: str, password: str, api_cipher: ApiCipherType
@@ -154,7 +164,8 @@ class AbstractGateApi(
         self._username: Final[str] = username
         self._password: Final[str] = password
         self._cipher: Final[ApiCipherType] = api_cipher
-        self._api_url: Final[str] = AbstractGateApi.API_URL_TEMPLATE % host
+        self._session: Final[Session] = Session()
+        self._cookies: Final[Dict[str, str]] = {}
 
     @property
     def host(self) -> str:
@@ -178,6 +189,55 @@ class AbstractGateApi(
 
     def _request(
         self,
+        service_path: ServicePath,
+        method: str = "GET",
+        query: Optional[Dict[str, str]] = None,
+        data: Optional[Dict[str, str]] = None,
+    ) -> Response:
+        return self._session.request(
+            method=method,
+            url=AbstractGateApi.service_url(self._host, service_path),
+            data=data,
+            params=query,
+            cookies=self._cookies,
+            timeout=5,
+        )
+
+    def _json_web_request(
+        self, target: ServicePath, query_params: Optional[Dict[str, str]] = None
+    ) -> Any:
+        def do_request() -> Any:
+            response = self._request(target, query=query_params)
+            response_text = response.content.decode("utf-8")
+            if (
+                RestrictedAccessException.RESPONSE_ERROR.lower()
+                in response_text.lower()
+            ):
+                raise RestrictedAccessException()
+
+            if not response_text:
+                return None
+
+            return json.loads(response_text)
+
+        try:
+            return do_request()
+        except RestrictedAccessException:
+            # Attempt to authenticate.
+            self._request(
+                ServicePath.INDEX,
+                method="POST",
+                data={
+                    LOGIN_FORM_USER: self._username,
+                    LOGIN_FORM_PASSWORD: self._password,
+                    LOGIN_FORM_BUTTON: "Sign In",
+                },
+            )
+
+        return do_request()
+
+    def _xml_api_request(
+        self,
         option: RequestOption,
         arg1: Optional[str] = None,
         arg2: Optional[str] = None,
@@ -192,13 +252,12 @@ class AbstractGateApi(
             )
         )
 
-        response: Final[Response] = requests.get(
-            self._api_url,
-            params={
+        response: Final[Response] = self._request(
+            ServicePath.API,
+            query={
                 "data": self._cipher.encrypt(command_str),
                 **self._get_extra_url_params(),
             },
-            timeout=5,
         )
         response_raw: Final[str] = response.content.decode("utf-8")
 
@@ -219,6 +278,19 @@ class AbstractGateApi(
             )
 
         return root_element
+
+    def sensor(self, door_id: int) -> SensorResponse:
+        """Get sensor data for a specific door.
+
+        Note: Raises RestrictedAccessException if username/password do not match.
+        """
+        response: Final[Any] = self._json_web_request(
+            ServicePath.ISG_TEMPERATURE, {"door": str(door_id)}
+        )
+        if not response:
+            raise InvalidDoorException(door_id)
+
+        return list_to_sensor_response(response)
 
     @abc.abstractmethod
     def info(self) -> InfoResponseType:
@@ -248,7 +320,7 @@ class AbstractGateApi(
 
     def _info(self) -> Element:
         """Get info about the device and doors."""
-        return self._request(RequestOption.INFO)
+        return self._xml_api_request(RequestOption.INFO)
 
     def _activate(
         self, door_id: int, info: Optional[InfoResponseType] = None
@@ -259,7 +331,7 @@ class AbstractGateApi(
         running this method during an action will stop the door. It's
         recommended you use open_door() or close_door() as those methods check
         the status before running and run if needed."""
-        return self._request(
+        return self._xml_api_request(
             RequestOption.ACTIVATE,
             str(door_id),
             self._get_activate_api_code(info if info else self.info(), door_id),
@@ -294,6 +366,11 @@ class AbstractGateApi(
         :return True if open command sent, False otherwise.
         """
         return self._set_door_status(door_id, DoorStatus.OPENED)
+
+    @staticmethod
+    def service_url(host: str, service_path: ServicePath) -> str:
+        """Create a url."""
+        return AbstractGateApi.URL_TEMPLATE % (host, service_path.value)
 
 
 class ISmartGateApi(

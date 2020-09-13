@@ -3,10 +3,12 @@ import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 import json
-from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, List, Optional, Tuple, Type, TypeVar, Union, cast
 from xml.etree.ElementTree import Element  # nosec
 
 from typing_extensions import Final
+
+from .const import NONE_INT
 
 GenericType = TypeVar("GenericType")
 
@@ -168,7 +170,28 @@ class DoorNotSetException(ApiError):
     """Door not set exception."""
 
 
+class RestrictedAccessException(Exception):
+    """User is not logged in or does not have permissions."""
+
+    RESPONSE_ERROR = "Restricted Access"
+
+
+class InvalidDoorException(Exception):
+    """Invalid door provided by user."""
+
+    def __init__(self, door_id: int) -> None:
+        super().__init__(f"Door: {door_id}")
+
+
 ExceptionGenerator = Callable[[int, str], ApiError]
+
+
+class ServicePath(Enum):
+    """Path of specific service on the device."""
+
+    INDEX = "index.php"
+    API = "api.php"
+    ISG_TEMPERATURE = "isg/temperature.php"
 
 
 class DoorStatus(Enum):
@@ -313,6 +336,14 @@ class ISmartGateInfoResponse(AbstractInfoResponse):
     door1: ISmartGateDoor
     door2: ISmartGateDoor
     door3: ISmartGateDoor
+
+
+@dataclass(frozen=True)
+class SensorResponse:
+    """Response from GogoGate2 and iSmartGate temperature calls."""
+
+    temperature: Optional[float]
+    battery_level: Optional[int]
 
 
 def element_or_none(element: Optional[Element], tag: str) -> Optional[Element]:
@@ -499,6 +530,17 @@ def element_to_ismartgate_activate_response(
     """Get response from xml element."""
     return ISmartGateActivateResponse(
         result=element_text_or_raise(element, "result").lower() == "ok"
+    )
+
+
+def list_to_sensor_response(data: List[str]) -> SensorResponse:
+    """Get response from a list."""
+    temp = int_or_none(data[0]) or NONE_INT
+    battery = int_or_none(data[1]) or NONE_INT
+
+    return SensorResponse(
+        temperature=temp / 1000 if temp > NONE_INT else None,
+        battery_level=battery if battery > NONE_INT else None,
     )
 
 

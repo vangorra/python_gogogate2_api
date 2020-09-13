@@ -7,7 +7,14 @@ from gogogate2_api import (
     ISmartGateApi,
     ISmartGateApiCipher,
 )
-from gogogate2_api.common import ApiError, DoorStatus, get_door_by_id
+from gogogate2_api.common import (
+    ApiError,
+    DoorStatus,
+    InvalidDoorException,
+    RestrictedAccessException,
+    SensorResponse,
+    get_door_by_id,
+)
 from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 import pytest
 import requests
@@ -243,3 +250,39 @@ def test_open_and_close_door(
     assert door1.status == DoorStatus.OPENED
     assert door2.status == DoorStatus.CLOSED
     assert door3.status == DoorStatus.UNDEFINED
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator"), ((GogoGate2Api, MockGogoGate2Server),),
+)
+@responses.activate
+# pylint: disable=too-many-statements
+def test_sensor(api_generator: ApiGenerator, server_generator: ServerGenerator) -> None:
+    """Test open and close door."""
+    api = api_generator("device1", "fakeuser", "fakepassword")
+    server_generator(api)
+
+    with pytest.raises(InvalidDoorException):
+        api.sensor(0)
+
+    assert api.sensor(1) == SensorResponse(temperature=23.456, battery_level=None)
+
+    assert api.sensor(2) == SensorResponse(temperature=None, battery_level=20)
+
+    assert api.sensor(3) == SensorResponse(temperature=None, battery_level=None)
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator"), ((GogoGate2Api, MockGogoGate2Server),),
+)
+@responses.activate
+# pylint: disable=too-many-statements
+def test_sensor_auth_fail(
+    api_generator: ApiGenerator, server_generator: ServerGenerator
+) -> None:
+    """Test open and close door."""
+    api = api_generator("device1", "fakeuser", "fakepassword")
+    server_generator(api, username="otheruser")
+
+    with pytest.raises(RestrictedAccessException):
+        api.sensor(1)
