@@ -243,3 +243,34 @@ def test_open_and_close_door(
     assert door1.status == DoorStatus.OPENED
     assert door2.status == DoorStatus.CLOSED
     assert door3.status == DoorStatus.UNDEFINED
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator", "true_value"),
+    (
+        (GogoGate2Api, MockGogoGate2Server, "1"),
+        (ISmartGateApi, MockISmartGateServer, "yes"),
+    ),
+)
+@responses.activate
+# pylint: disable=too-many-statements
+def test_remoteaccess(
+    api_generator: ApiGenerator, server_generator: ServerGenerator, true_value: str
+) -> None:
+    """Test open and close door."""
+    api = api_generator("device1", "fakeuser", "fakepassword")
+    server = server_generator(api)
+
+    server.set_info_value("remoteaccessenabled", "false")
+    assert not api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", "no")
+    assert not api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", "0")
+    assert not api.info().remoteaccessenabled
+
+    server.set_info_value("remoteaccessenabled", true_value)
+    assert api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", true_value.upper())
+    assert api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", true_value.lower())
+    assert api.info().remoteaccessenabled
