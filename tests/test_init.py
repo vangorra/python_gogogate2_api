@@ -243,3 +243,28 @@ def test_open_and_close_door(
     assert door1.status == DoorStatus.OPENED
     assert door2.status == DoorStatus.CLOSED
     assert door3.status == DoorStatus.UNDEFINED
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator"),
+    ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
+)
+@responses.activate
+# pylint: disable=too-many-statements
+def test_sensor_temperature_and_voltage(
+    api_generator: ApiGenerator, server_generator: ServerGenerator
+) -> None:
+    """Test open and close door."""
+    api = api_generator("device1", "fakeuser", "fakepassword")
+    server_generator(api)
+
+    # Initial info.
+    response = api.info()
+    assert response.door1.temperature == 16.3
+    assert response.door1.voltage == 40
+
+    assert response.door2.temperature is None
+    assert response.door2.voltage == 40
+
+    assert response.door3.temperature == 16.3
+    assert response.door3.voltage is None
