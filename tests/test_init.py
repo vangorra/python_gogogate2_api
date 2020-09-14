@@ -283,7 +283,7 @@ def test_remoteaccess(
 @responses.activate
 # pylint: disable=too-many-statements
 def test_sensor_temperature_and_voltage(
-        api_generator: ApiGenerator, server_generator: ServerGenerator
+    api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
     api = api_generator("device1", "fakeuser", "fakepassword")
