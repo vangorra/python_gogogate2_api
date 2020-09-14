@@ -20,7 +20,7 @@ from gogogate2_api.common import (
     RequestOption,
     Wifi,
 )
-from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
+from gogogate2_api.const import NONE_INT, GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 import responses
 from typing_extensions import Final
 
@@ -229,6 +229,7 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
                 events=None,
                 sensorid="sensor123",
                 temperature=16.3,
+                voltage=40,
             ),
             door2=GogoGate2Door(
                 door_id=3,
@@ -241,7 +242,8 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
                 camera=False,
                 events=None,
                 sensorid="sensor123",
-                temperature=16.3,
+                temperature=NONE_INT,
+                voltage=40,
             ),
             door3=GogoGate2Door(
                 door_id=3,
@@ -255,6 +257,7 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
                 events=None,
                 sensorid="sensor123",
                 temperature=16.3,
+                voltage=NONE_INT,
             ),
             outputs=Outputs(output1=True, output2=False, output3=False,),
             network=Network(ip="127.0.0.1"),
@@ -339,6 +342,7 @@ class MockISmartGateServer(AbstractMockServer[ISmartGateInfoResponse]):
                 events=None,
                 sensorid="sensor123",
                 temperature=16.3,
+                voltage=40,
             ),
             door2=ISmartGateDoor(
                 enabled=True,
@@ -354,7 +358,8 @@ class MockISmartGateServer(AbstractMockServer[ISmartGateInfoResponse]):
                 camera=False,
                 events=None,
                 sensorid="sensor123",
-                temperature=16.3,
+                temperature=NONE_INT,
+                voltage=40,
             ),
             door3=ISmartGateDoor(
                 enabled=True,
@@ -371,6 +376,7 @@ class MockISmartGateServer(AbstractMockServer[ISmartGateInfoResponse]):
                 events=None,
                 sensorid="sensor123",
                 temperature=16.3,
+                voltage=NONE_INT,
             ),
             network=Network(ip="127.0.0.1"),
             wifi=Wifi(SSID="Wifi network", linkquality="80%", signal="20"),

@@ -89,6 +89,7 @@ def test_get_enabled_doors() -> None:
             camera=False,
             events=2,
             temperature=None,
+            voltage=None,
         ),
         door2=GogoGate2Door(
             door_id=2,
@@ -102,6 +103,7 @@ def test_get_enabled_doors() -> None:
             camera=False,
             events=2,
             temperature=None,
+            voltage=None,
         ),
         door3=GogoGate2Door(
             door_id=3,
@@ -115,6 +117,7 @@ def test_get_enabled_doors() -> None:
             camera=False,
             events=2,
             temperature=None,
+            voltage=None,
         ),
         outputs=Outputs(output1=True, output2=False, output3=True),
         network=Network(ip=""),

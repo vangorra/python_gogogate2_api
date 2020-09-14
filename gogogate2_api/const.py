@@ -33,3 +33,6 @@ class ISmartGateApiErrorCode(IntEnum):
     INVALID_DOOR = 997
     INVALID_TOKEN = 998
     CORRUPTED_DATA = 999
+
+
+NONE_INT = -100000
