@@ -246,13 +246,44 @@ def test_open_and_close_door(
 
 
 @pytest.mark.parametrize(
+    ("api_generator", "server_generator", "true_value"),
+    (
+        (GogoGate2Api, MockGogoGate2Server, "1"),
+        (ISmartGateApi, MockISmartGateServer, "yes"),
+    ),
+)
+@responses.activate
+# pylint: disable=too-many-statements
+def test_remoteaccess(
+    api_generator: ApiGenerator, server_generator: ServerGenerator, true_value: str
+) -> None:
+    """Test open and close door."""
+    api = api_generator("device1", "fakeuser", "fakepassword")
+    server = server_generator(api)
+
+    server.set_info_value("remoteaccessenabled", "false")
+    assert not api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", "no")
+    assert not api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", "0")
+    assert not api.info().remoteaccessenabled
+
+    server.set_info_value("remoteaccessenabled", true_value)
+    assert api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", true_value.upper())
+    assert api.info().remoteaccessenabled
+    server.set_info_value("remoteaccessenabled", true_value.lower())
+    assert api.info().remoteaccessenabled
+
+
+@pytest.mark.parametrize(
     ("api_generator", "server_generator"),
     ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
 )
 @responses.activate
 # pylint: disable=too-many-statements
 def test_sensor_temperature_and_voltage(
-    api_generator: ApiGenerator, server_generator: ServerGenerator
+        api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
     api = api_generator("device1", "fakeuser", "fakepassword")

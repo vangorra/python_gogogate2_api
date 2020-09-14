@@ -279,7 +279,7 @@ class AbstractInfoResponse:
     user: str
     model: str
     apiversion: str
-    remoteaccessenabled: int
+    remoteaccessenabled: bool
     remoteaccess: str
     firmwareversion: str
 
@@ -484,8 +484,10 @@ def element_to_ismartgate_info_response(element: Element) -> ISmartGateInfoRespo
         ismartgatename=element_text_or_raise(element, "ismartgatename"),
         model=element_text_or_raise(element, "model"),
         apiversion=element_text_or_raise(element, "apiversion"),
-        remoteaccessenabled=element_text_or_raise(element, "remoteaccessenabled")
-        == "1",
+        remoteaccessenabled=element_text_or_raise(
+            element, "remoteaccessenabled"
+        ).lower()
+        == "yes",
         remoteaccess=element_text_or_raise(element, "remoteaccess"),
         firmwareversion=element_text_or_raise(element, "firmwareversion"),
         newfirmware=element_text_or_raise(element, "newfirmware").lower() == "yes",

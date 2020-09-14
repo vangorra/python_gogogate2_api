@@ -102,6 +102,10 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         """Set the status of a device."""
         self._info_data[f"door{door_id}"]["status"] = door_status.value
 
+    def set_info_value(self, name: str, value: Any) -> None:
+        """Set a value of info data."""
+        self._info_data[name] = value
+
     # pylint: disable=too-many-return-statements
     def _handle_request(self, request: Any) -> tuple:
         # Simulate an HTTP error.
@@ -209,7 +213,7 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
             model="GG2",
             apicode=self.api_code,
             apiversion="apiversion123",
-            remoteaccessenabled=0,
+            remoteaccessenabled=False,
             remoteaccess="abcdefg12345.my-gogogate.com",
             firmwareversion="761",
             gogogatename="Home",
@@ -320,7 +324,7 @@ class MockISmartGateServer(AbstractMockServer[ISmartGateInfoResponse]):
             user=self.username,
             model="GG2",
             apiversion="apiversion123",
-            remoteaccessenabled=0,
+            remoteaccessenabled=False,
             remoteaccess="abcdefg12345.my-gogogate.com",
             firmwareversion="761",
             door1=ISmartGateDoor(
