@@ -1,5 +1,7 @@
 """Tets for main API."""
+import time
 from typing import Callable, Union
+from unittest.mock import patch
 
 from gogogate2_api import (
     GogoGate2Api,
@@ -8,7 +10,11 @@ from gogogate2_api import (
     ISmartGateApiCipher,
 )
 from gogogate2_api.common import ApiError, DoorStatus, get_door_by_id
-from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
+from gogogate2_api.const import (
+    TRANSITION_COMPLETE_DURATION,
+    GogoGate2ApiErrorCode,
+    ISmartGateApiErrorCode,
+)
 import pytest
 import requests
 import responses
@@ -187,7 +193,7 @@ def test_open_and_close_door(
     assert door1
     assert door2
     assert door3
-    assert door1.status == DoorStatus.OPENED
+    assert door1.status == DoorStatus.OPENING
     assert door2.status == DoorStatus.OPENED
     assert door3.status == DoorStatus.UNDEFINED
 
@@ -200,8 +206,8 @@ def test_open_and_close_door(
     assert door1
     assert door2
     assert door3
-    assert door1.status == DoorStatus.OPENED
-    assert door2.status == DoorStatus.CLOSED
+    assert door1.status == DoorStatus.OPENING
+    assert door2.status == DoorStatus.CLOSING
     assert door3.status == DoorStatus.UNDEFINED
 
     # No change for already closed door.
@@ -213,8 +219,8 @@ def test_open_and_close_door(
     assert door1
     assert door2
     assert door3
-    assert door1.status == DoorStatus.OPENED
-    assert door2.status == DoorStatus.CLOSED
+    assert door1.status == DoorStatus.OPENING
+    assert door2.status == DoorStatus.CLOSING
     assert door3.status == DoorStatus.UNDEFINED
 
     # No change for unknown door.
@@ -226,14 +232,30 @@ def test_open_and_close_door(
     assert door1
     assert door2
     assert door3
-    assert door1.status == DoorStatus.OPENED
-    assert door2.status == DoorStatus.CLOSED
+    assert door1.status == DoorStatus.OPENING
+    assert door2.status == DoorStatus.CLOSING
     assert door3.status == DoorStatus.UNDEFINED
 
     # No change for unsupported status.
     # pylint: disable=protected-access
     assert api._set_door_status(1, DoorStatus.UNDEFINED) is False
     response = api.info()
+    door1 = get_door_by_id(1, response)
+    door2 = get_door_by_id(2, response)
+    door3 = get_door_by_id(3, response)
+    assert door1
+    assert door2
+    assert door3
+    assert door1.status == DoorStatus.OPENING
+    assert door2.status == DoorStatus.CLOSING
+    assert door3.status == DoorStatus.UNDEFINED
+
+    # Verify assumed state expires
+    now = time.time()
+    with patch(
+        "gogogate2_api.time.time", return_value=now + TRANSITION_COMPLETE_DURATION
+    ):
+        response = api.info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)

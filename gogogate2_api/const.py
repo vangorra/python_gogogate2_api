@@ -36,3 +36,5 @@ class ISmartGateApiErrorCode(IntEnum):
 
 
 NONE_INT = -100000
+
+TRANSITION_COMPLETE_DURATION = 55

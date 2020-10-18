@@ -4,7 +4,8 @@ import base64
 from hashlib import sha1
 import json
 import secrets
-from typing import Dict, Generic, Optional, TypeVar, Union, cast
+import time
+from typing import Dict, Generic, Optional, Tuple, TypeVar, Union, cast
 import uuid
 from xml.etree.ElementTree import Element  # nosec
 
@@ -31,6 +32,7 @@ from .common import (
     ISmartGateDoor,
     ISmartGateInfoResponse,
     RequestOption,
+    assumed_state_to_door_status,
     element_to_api_error,
     element_to_gogogate2_activate_response,
     element_to_gogogate2_info_response,
@@ -38,7 +40,11 @@ from .common import (
     element_to_ismartgate_info_response,
     get_door_by_id,
 )
-from .const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
+from .const import (
+    TRANSITION_COMPLETE_DURATION,
+    GogoGate2ApiErrorCode,
+    ISmartGateApiErrorCode,
+)
 
 DEFAULT_TIMEOUT = 20
 
@@ -109,9 +115,9 @@ class ISmartGateApiCipher(ApiCipher):
         self._password: Final[str] = password
 
         # Calculate the token.
-        raw_token: Final[
-            str
-        ] = ISmartGateApiCipher.RAW_TOKEN_FORMAT % self._username.lower()
+        raw_token: Final[str] = (
+            ISmartGateApiCipher.RAW_TOKEN_FORMAT % self._username.lower()
+        )
         self._token: Final[str] = sha1(raw_token.encode("utf-8")).hexdigest()  # nosec
 
         # Calculate the key and pass it onto the superclass.
@@ -163,6 +169,7 @@ class AbstractGateApi(
         self._cipher: Final[ApiCipherType] = api_cipher
         self._timeout = timeout or DEFAULT_TIMEOUT
         self._api_url: Final[str] = AbstractGateApi.API_URL_TEMPLATE % host
+        self._assumed_door_status: Dict[int, Tuple[float, DoorStatus]] = {}
 
     @property
     def host(self) -> str:
@@ -258,6 +265,19 @@ class AbstractGateApi(
         """Get info about the device and doors."""
         return self._request(RequestOption.INFO)
 
+    @property
+    def _assumed_status(self) -> Dict[int, DoorStatus]:
+        """Build a dict of non-expired assumed door status."""
+        now = time.time()
+        non_expired_assumed_status = {}
+        for door_id, assumed_status in self._assumed_door_status.items():
+            expire_time, door_status = assumed_status
+            if expire_time < now:
+                continue
+            non_expired_assumed_status[door_id] = door_status
+
+        return non_expired_assumed_status
+
     def _activate(
         self, door_id: int, info: Optional[InfoResponseType] = None
     ) -> Element:
@@ -283,30 +303,45 @@ class AbstractGateApi(
         door: Final[Optional[AbstractDoor]] = get_door_by_id(door_id, info)
 
         # No door found or door already at desired status.
-        if not door or door.status == door_status:
+        if not door or assumed_state_to_door_status(
+            door.status
+        ) == assumed_state_to_door_status(door_status):
             return False
 
         self._activate(door_id, info)
         return True
+
+    def _set_assumed_door_status(self, door_id: int, door_status: DoorStatus) -> None:
+        """Set a temporary assumed state for the expected duration."""
+        self._assumed_door_status[door_id] = (
+            time.time() + TRANSITION_COMPLETE_DURATION,
+            door_status,
+        )
 
     def close_door(self, door_id: int) -> bool:
         """Close a door.
 
         :return True if close command sent, False otherwise.
         """
-        return self._set_door_status(door_id, DoorStatus.CLOSED)
+        response = self._set_door_status(door_id, DoorStatus.CLOSED)
+        if response:
+            self._set_assumed_door_status(door_id, DoorStatus.CLOSING)
+        return response
 
     def open_door(self, door_id: int) -> bool:
         """Open a door.
 
         :return True if open command sent, False otherwise.
         """
-        return self._set_door_status(door_id, DoorStatus.OPENED)
+        response = self._set_door_status(door_id, DoorStatus.OPENED)
+        if response:
+            self._set_assumed_door_status(door_id, DoorStatus.OPENING)
+        return response
 
 
 class ISmartGateApi(
     AbstractGateApi[
-        ISmartGateApiCipher, ISmartGateInfoResponse, GogoGate2ActivateResponse
+        ISmartGateApiCipher, ISmartGateInfoResponse, ISmartGateActivateResponse
     ]
 ):
     """API for interacting with iSmartGate devices."""
@@ -329,16 +364,16 @@ class ISmartGateApi(
 
     def info(self) -> ISmartGateInfoResponse:
         """Get info about the device and doors."""
-        return element_to_ismartgate_info_response(self._info())
+        return element_to_ismartgate_info_response(self._info(), self._assumed_status)
 
-    def activate(self, door_id: int) -> GogoGate2ActivateResponse:
+    def activate(self, door_id: int) -> ISmartGateActivateResponse:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        return element_to_gogogate2_activate_response(self._activate(door_id))
+        return element_to_ismartgate_activate_response(self._activate(door_id))
 
     #  pylint: disable=no-self-use
     def _get_activate_api_code(self, info: ISmartGateInfoResponse, door_id: int) -> str:
@@ -370,7 +405,7 @@ class ISmartGateApi(
 
 class GogoGate2Api(
     AbstractGateApi[
-        GogoGate2ApiCipher, GogoGate2InfoResponse, ISmartGateActivateResponse
+        GogoGate2ApiCipher, GogoGate2InfoResponse, GogoGate2ActivateResponse
     ]
 ):
     """API for interacting with GogoGate2 devices."""
@@ -389,16 +424,16 @@ class GogoGate2Api(
 
     def info(self) -> GogoGate2InfoResponse:
         """Get info about the device and doors."""
-        return element_to_gogogate2_info_response(self._info())
+        return element_to_gogogate2_info_response(self._info(), self._assumed_status)
 
-    def activate(self, door_id: int) -> ISmartGateActivateResponse:
+    def activate(self, door_id: int) -> GogoGate2ActivateResponse:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        return element_to_ismartgate_activate_response(self._activate(door_id))
+        return element_to_gogogate2_activate_response(self._activate(door_id))
 
     @staticmethod
     def _get_exception_map() -> Dict[int, ExceptionGenerator]:

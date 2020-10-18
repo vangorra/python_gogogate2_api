@@ -3,7 +3,7 @@ import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 import json
-from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, cast
 from xml.etree.ElementTree import Element  # nosec
 
 from typing_extensions import Final
@@ -178,6 +178,8 @@ class DoorStatus(Enum):
 
     CLOSED = "closed"
     OPENED = "opened"
+    CLOSING = "closing"
+    OPENING = "opening"
     UNDEFINED = "undefined"
 
 
@@ -393,7 +395,9 @@ def outputs_or_raise(element: Element) -> Outputs:
     )
 
 
-def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
+def gogogate2_door_or_raise(
+    door_id: int, element: Element, assumed_status: Optional[DoorStatus]
+) -> GogoGate2Door:
     """Get door from xml element."""
     temp: Final[Optional[float]] = float_or_none(
         element_text_or_none(element, "temperature")
@@ -409,7 +413,8 @@ def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
         mode=cast(
             DoorMode, enum_or_raise(element_text_or_raise(element, "mode"), DoorMode)
         ),
-        status=cast(
+        status=assumed_status
+        or cast(
             DoorStatus,
             enum_or_raise(element_text_or_raise(element, "status"), DoorStatus),
         ),
@@ -422,7 +427,9 @@ def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
     )
 
 
-def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
+def ismartgate_door_or_raise(
+    door_id: int, element: Element, assumed_status: Optional[DoorStatus]
+) -> ISmartGateDoor:
     """Get door from xml element."""
     temp: Final[Optional[float]] = float_or_none(
         element_text_or_none(element, "temperature")
@@ -441,7 +448,8 @@ def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
         mode=cast(
             DoorMode, enum_or_raise(element_text_or_raise(element, "mode"), DoorMode)
         ),
-        status=cast(
+        status=assumed_status
+        or cast(
             DoorStatus,
             enum_or_raise(element_text_or_raise(element, "status"), DoorStatus),
         ),
@@ -454,7 +462,9 @@ def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
     )
 
 
-def element_to_gogogate2_info_response(element: Element) -> GogoGate2InfoResponse:
+def element_to_gogogate2_info_response(
+    element: Element, assumed_status: Dict[int, DoorStatus]
+) -> GogoGate2InfoResponse:
     """Get response from xml element."""
     return GogoGate2InfoResponse(
         user=element_text_or_raise(element, "user"),
@@ -466,16 +476,24 @@ def element_to_gogogate2_info_response(element: Element) -> GogoGate2InfoRespons
         remoteaccess=element_text_or_raise(element, "remoteaccess"),
         firmwareversion=element_text_or_raise(element, "firmwareversion"),
         apicode=element_text_or_raise(element, "apicode"),
-        door1=gogogate2_door_or_raise(1, element_or_raise(element, "door1")),
-        door2=gogogate2_door_or_raise(2, element_or_raise(element, "door2")),
-        door3=gogogate2_door_or_raise(3, element_or_raise(element, "door3")),
+        door1=gogogate2_door_or_raise(
+            1, element_or_raise(element, "door1"), assumed_status.get(1)
+        ),
+        door2=gogogate2_door_or_raise(
+            2, element_or_raise(element, "door2"), assumed_status.get(2)
+        ),
+        door3=gogogate2_door_or_raise(
+            3, element_or_raise(element, "door3"), assumed_status.get(3)
+        ),
         outputs=outputs_or_raise(element_or_raise(element, "outputs")),
         network=network_or_raise(element_or_raise(element, "network")),
         wifi=wifi_or_raise(element_or_raise(element, "wifi")),
     )
 
 
-def element_to_ismartgate_info_response(element: Element) -> ISmartGateInfoResponse:
+def element_to_ismartgate_info_response(
+    element: Element, assumed_status: Dict[int, DoorStatus]
+) -> ISmartGateInfoResponse:
     """Get response from xml element."""
     return ISmartGateInfoResponse(
         user=element_text_or_raise(element, "user"),
@@ -491,12 +509,27 @@ def element_to_ismartgate_info_response(element: Element) -> ISmartGateInfoRespo
         remoteaccess=element_text_or_raise(element, "remoteaccess"),
         firmwareversion=element_text_or_raise(element, "firmwareversion"),
         newfirmware=element_text_or_raise(element, "newfirmware").lower() == "yes",
-        door1=ismartgate_door_or_raise(1, element_or_raise(element, "door1")),
-        door2=ismartgate_door_or_raise(2, element_or_raise(element, "door2")),
-        door3=ismartgate_door_or_raise(3, element_or_raise(element, "door3")),
+        door1=ismartgate_door_or_raise(
+            1, element_or_raise(element, "door1"), assumed_status.get(1)
+        ),
+        door2=ismartgate_door_or_raise(
+            2, element_or_raise(element, "door2"), assumed_status.get(2)
+        ),
+        door3=ismartgate_door_or_raise(
+            3, element_or_raise(element, "door3"), assumed_status.get(3)
+        ),
         network=network_or_raise(element_or_raise(element, "network")),
         wifi=wifi_or_raise(element_or_raise(element, "wifi")),
     )
+
+
+def assumed_state_to_door_status(door_status: DoorStatus) -> DoorStatus:
+    """Translate assumed state."""
+    if door_status == DoorStatus.CLOSING:
+        return DoorStatus.CLOSED
+    if door_status == DoorStatus.OPENING:
+        return DoorStatus.OPENED
+    return door_status
 
 
 def element_to_gogogate2_activate_response(
