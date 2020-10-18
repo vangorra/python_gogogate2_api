@@ -5,15 +5,14 @@ from hashlib import sha1
 import json
 import secrets
 import time
-from typing import Dict, Generic, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Dict, Generic, Optional, Tuple, TypeVar, Union, cast
 import uuid
 from xml.etree.ElementTree import Element  # nosec
 
 from Crypto.Cipher import AES  # nosec
 from Crypto.Cipher._mode_cbc import CbcMode  # nosec
 from defusedxml import ElementTree
-import requests
-from requests import Response
+import httpx
 from typing_extensions import Final
 
 from .common import (
@@ -147,7 +146,7 @@ ActivateResponseType = TypeVar(
 )
 
 
-class AbstractGateApi(
+class AbstractGateApi(  # pylint: disable=too-many-instance-attributes
     Generic[ApiCipherType, InfoResponseType, ActivateResponseType], abc.ABC
 ):
     """API capable of communicating with a gogogate2 devices."""
@@ -170,6 +169,7 @@ class AbstractGateApi(
         self._timeout = timeout or DEFAULT_TIMEOUT
         self._api_url: Final[str] = AbstractGateApi.API_URL_TEMPLATE % host
         self._assumed_door_status: Dict[int, Tuple[float, DoorStatus]] = {}
+        self._async_client = httpx.AsyncClient()
 
     @property
     def host(self) -> str:
@@ -191,12 +191,13 @@ class AbstractGateApi(
         """Get the cipher."""
         return self._cipher
 
-    def _request(
+    def _build_params(
         self,
         option: RequestOption,
         arg1: Optional[str] = None,
         arg2: Optional[str] = None,
-    ) -> Element:
+    ) -> Dict[str, Any]:
+        """Create params for the get request."""
         command_str: Final[str] = json.dumps(
             (
                 self._username,
@@ -206,15 +207,31 @@ class AbstractGateApi(
                 "" if arg2 is None else arg2,
             )
         )
-
-        response: Final[Response] = requests.get(
-            self._api_url,
-            params={
+        return {
+            "url": self._api_url,
+            "params": {
                 "data": self._cipher.encrypt(command_str),
                 **self._get_extra_url_params(),
             },
-            timeout=self._timeout,
+            "timeout": self._timeout,
+        }
+
+    async def _async_request(
+        self,
+        option: RequestOption,
+        arg1: Optional[str] = None,
+        arg2: Optional[str] = None,
+    ) -> Element:
+        response: Final[httpx.Response] = await self._async_client.get(
+            **self._build_params(option, arg1, arg2)
         )
+
+        response.raise_for_status()
+
+        return self._parse_response(response)
+
+    def _parse_response(self, response: httpx.Response) -> Element:
+        """Parse the response from the device."""
         response_raw: Final[str] = response.content.decode("utf-8")
 
         try:
@@ -236,11 +253,11 @@ class AbstractGateApi(
         return root_element
 
     @abc.abstractmethod
-    def info(self) -> InfoResponseType:
+    async def async_info(self) -> InfoResponseType:
         """Get info about the device and doors."""
 
     @abc.abstractmethod
-    def activate(self, door_id: int) -> ActivateResponseType:
+    async def async_activate(self, door_id: int) -> ActivateResponseType:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
@@ -261,9 +278,9 @@ class AbstractGateApi(
     def _get_extra_url_params(self) -> Dict[str, str]:
         return {}
 
-    def _info(self) -> Element:
+    async def _async_info(self) -> Element:
         """Get info about the device and doors."""
-        return self._request(RequestOption.INFO)
+        return await self._async_request(RequestOption.INFO)
 
     @property
     def _assumed_status(self) -> Dict[int, DoorStatus]:
@@ -278,7 +295,7 @@ class AbstractGateApi(
 
         return non_expired_assumed_status
 
-    def _activate(
+    async def _async_activate(
         self, door_id: int, info: Optional[InfoResponseType] = None
     ) -> Element:
         """Send a command to open/close/stop the door.
@@ -287,19 +304,23 @@ class AbstractGateApi(
         running this method during an action will stop the door. It's
         recommended you use open_door() or close_door() as those methods check
         the status before running and run if needed."""
-        return self._request(
+        return await self._async_request(
             RequestOption.ACTIVATE,
             str(door_id),
-            self._get_activate_api_code(info if info else self.info(), door_id),
+            self._get_activate_api_code(
+                info if info else await self.async_info(), door_id
+            ),
         )
 
-    def _set_door_status(self, door_id: int, door_status: DoorStatus) -> bool:
+    async def _async_set_door_status(
+        self, door_id: int, door_status: DoorStatus
+    ) -> bool:
         """Send call to open/close a door if door is not already in that state."""
         if door_status == DoorStatus.UNDEFINED:
             return False
 
         # Get current door status.
-        info: Final[InfoResponseType] = self.info()
+        info: Final[InfoResponseType] = await self.async_info()
         door: Final[Optional[AbstractDoor]] = get_door_by_id(door_id, info)
 
         # No door found or door already at desired status.
@@ -308,7 +329,7 @@ class AbstractGateApi(
         ) == assumed_state_to_door_status(door_status):
             return False
 
-        self._activate(door_id, info)
+        await self._async_activate(door_id, info)
         return True
 
     def _set_assumed_door_status(self, door_id: int, door_status: DoorStatus) -> None:
@@ -318,25 +339,29 @@ class AbstractGateApi(
             door_status,
         )
 
-    def close_door(self, door_id: int) -> bool:
+    async def async_close_door(self, door_id: int) -> bool:
         """Close a door.
 
         :return True if close command sent, False otherwise.
         """
-        response = self._set_door_status(door_id, DoorStatus.CLOSED)
+        response = await self._async_set_door_status(door_id, DoorStatus.CLOSED)
         if response:
             self._set_assumed_door_status(door_id, DoorStatus.CLOSING)
         return response
 
-    def open_door(self, door_id: int) -> bool:
+    async def async_open_door(self, door_id: int) -> bool:
         """Open a door.
 
         :return True if open command sent, False otherwise.
         """
-        response = self._set_door_status(door_id, DoorStatus.OPENED)
+        response = await self._async_set_door_status(door_id, DoorStatus.OPENED)
         if response:
             self._set_assumed_door_status(door_id, DoorStatus.OPENING)
         return response
+
+    async def async_remove(self) -> None:
+        """Remove the object"""
+        await self._async_client.aclose()
 
 
 class ISmartGateApi(
@@ -362,18 +387,22 @@ class ISmartGateApi(
             timeout=timeout,
         )
 
-    def info(self) -> ISmartGateInfoResponse:
+    async def async_info(self) -> ISmartGateInfoResponse:
         """Get info about the device and doors."""
-        return element_to_ismartgate_info_response(self._info(), self._assumed_status)
+        return element_to_ismartgate_info_response(
+            await self._async_info(), self._assumed_status
+        )
 
-    def activate(self, door_id: int) -> ISmartGateActivateResponse:
+    async def async_activate(self, door_id: int) -> ISmartGateActivateResponse:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        return element_to_ismartgate_activate_response(self._activate(door_id))
+        return element_to_ismartgate_activate_response(
+            await self._async_activate(door_id)
+        )
 
     #  pylint: disable=no-self-use
     def _get_activate_api_code(self, info: ISmartGateInfoResponse, door_id: int) -> str:
@@ -422,18 +451,22 @@ class GogoGate2Api(
             host, username, password, GogoGate2ApiCipher(), timeout=timeout
         )
 
-    def info(self) -> GogoGate2InfoResponse:
+    async def async_info(self) -> GogoGate2InfoResponse:
         """Get info about the device and doors."""
-        return element_to_gogogate2_info_response(self._info(), self._assumed_status)
+        return element_to_gogogate2_info_response(
+            await self._async_info(), self._assumed_status
+        )
 
-    def activate(self, door_id: int) -> GogoGate2ActivateResponse:
+    async def async_activate(self, door_id: int) -> GogoGate2ActivateResponse:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        return element_to_gogogate2_activate_response(self._activate(door_id))
+        return element_to_gogogate2_activate_response(
+            await self._async_activate(door_id)
+        )
 
     @staticmethod
     def _get_exception_map() -> Dict[int, ExceptionGenerator]:

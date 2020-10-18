@@ -1,4 +1,5 @@
 """CLI for gate devices."""
+import asyncio
 from enum import Enum, unique
 from getpass import getpass
 import json
@@ -102,7 +103,10 @@ def cli(
 @click.pass_context
 def info(ctx: click.core.Context) -> None:
     """Get info from device."""
-    _echo_response(get_context_api(ctx).info())
+    _echo_response(
+        asyncio.get_event_loop().run_until_complete(get_context_api(ctx).async_info())
+    )
+    asyncio.get_event_loop().run_until_complete(get_context_api(ctx).async_remove())
 
 
 @cli.command(name=Command.OPEN.value)
@@ -110,7 +114,12 @@ def info(ctx: click.core.Context) -> None:
 @click.pass_context
 def open_door(ctx: click.core.Context, door_id: int) -> None:
     """Open the door."""
-    _echo_response(get_context_api(ctx).open_door(door_id))
+    _echo_response(
+        asyncio.get_event_loop().run_until_complete(
+            get_context_api(ctx).async_open_door(door_id)
+        )
+    )
+    asyncio.get_event_loop().run_until_complete(get_context_api(ctx).async_remove())
 
 
 @cli.command(name=Command.CLOSE.value)
@@ -118,7 +127,12 @@ def open_door(ctx: click.core.Context, door_id: int) -> None:
 @click.pass_context
 def close_door(ctx: click.core.Context, door_id: int) -> None:
     """Close the door."""
-    _echo_response(get_context_api(ctx).close_door(door_id))
+    _echo_response(
+        asyncio.get_event_loop().run_until_complete(
+            get_context_api(ctx).async_close_door(door_id)
+        )
+    )
+    asyncio.get_event_loop().run_until_complete(get_context_api(ctx).async_remove())
 
 
 def cli_with_defaults(device_type: DeviceType) -> None:

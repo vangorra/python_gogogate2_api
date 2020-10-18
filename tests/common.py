@@ -2,7 +2,7 @@
 import abc
 import json
 from typing import Any, Generic, List, Optional, TypeVar, Union
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs
 from xml.dom.minidom import parseString
 
 import dicttoxml
@@ -21,7 +21,8 @@ from gogogate2_api.common import (
     Wifi,
 )
 from gogogate2_api.const import NONE_INT, GogoGate2ApiErrorCode, ISmartGateApiErrorCode
-import responses
+import httpx
+import respx
 from typing_extensions import Final
 
 MockInfoResponse = TypeVar(
@@ -51,12 +52,8 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
             json.dumps(self._get_info_data(), indent=2, cls=EnhancedJSONEncoder)
         )
 
-        responses.reset()
-        responses.add_callback(
-            responses.GET,
-            AbstractGateApi.API_URL_TEMPLATE % self.host,
-            callback=self._handle_request,
-        )
+        respx.clear()
+        respx.add(self._handle_httpx_request)
 
     @abc.abstractmethod
     def _get_info_data(self) -> MockInfoResponse:
@@ -106,14 +103,26 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         """Set a value of info data."""
         self._info_data[name] = value
 
+    def _handle_httpx_request(
+        self, request: httpx.Request, response: httpx.Response
+    ) -> httpx.Response:
+        response_tup = self._handle_request(request)
+        response.http_status = response_tup[0]  # type: ignore
+        response.content = response_tup[2]  # type: ignore
+        return response
+
     # pylint: disable=too-many-return-statements
-    def _handle_request(self, request: Any) -> tuple:
+    def _handle_request(self, request: httpx.Request) -> tuple:
         # Simulate an HTTP error.
         if self.http_status != 200:
             return self._new_response("")
 
+        url = request.url
+        if url.host != self.host:
+            raise httpx.RequestError(request=request, message="incorrect host")
+
         # Parse the request.
-        query: Final[dict] = parse_qs(urlparse(request.url).query)
+        query: Final[dict] = parse_qs(url.query.decode("latin1"))
         data: Final[str] = query["data"][0]
 
         try:

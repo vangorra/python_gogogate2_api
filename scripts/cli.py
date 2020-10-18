@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """CLI for gogogate device."""
+import asyncio
 from enum import Enum
 import pprint
 from typing import Any, Optional, cast
@@ -61,7 +62,9 @@ def cli(
 def info(ctx: click.core.Context) -> None:
     """Get info from device."""
     api: GogoGate2Api = ctx.obj[API]
-    PRETTY_PRINT.pprint(unpack(api.info()))
+    PRETTY_PRINT.pprint(
+        unpack(asyncio.get_event_loop().run_until_complete(api.async_info()))
+    )
 
 
 @cli.command(name="open")
@@ -70,7 +73,11 @@ def info(ctx: click.core.Context) -> None:
 def open_door(ctx: click.core.Context, door_id: int) -> None:
     """Open the door."""
     api: GogoGate2Api = ctx.obj[API]
-    PRETTY_PRINT.pprint(unpack(api.open_door(door_id)))
+    PRETTY_PRINT.pprint(
+        unpack(
+            asyncio.get_event_loop().run_until_complete(api.async_open_door(door_id))
+        )
+    )
 
 
 @cli.command(name="close")
@@ -79,7 +86,11 @@ def open_door(ctx: click.core.Context, door_id: int) -> None:
 def close_door(ctx: click.core.Context, door_id: int) -> None:
     """Close the door."""
     api: GogoGate2Api = ctx.obj[API]
-    PRETTY_PRINT.pprint(unpack(api.close_door(door_id)))
+    PRETTY_PRINT.pprint(
+        unpack(
+            asyncio.get_event_loop().run_until_complete(api.async_close_door(door_id))
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -4,7 +4,6 @@ from enum import Enum
 import json
 import sys
 from typing import Callable
-from unittest.mock import MagicMock, Mock, patch
 
 from click.testing import CliRunner
 from gogogate2_api import GogoGate2Api, ISmartGateApi
@@ -18,6 +17,11 @@ from gogogate2_api.cli import (
     ismartgate_cli,
 )
 import pytest
+
+if sys.version_info[:2] < (3, 8):
+    from asynctest.mock import MagicMock, Mock, patch
+else:
+    from unittest.mock import MagicMock, Mock, patch
 
 
 class TestTypeEnum(Enum):
@@ -40,7 +44,7 @@ def test_info(class_mock: Mock) -> None:
     """Test get device info."""
     api = MagicMock(spec=GogoGate2Api)
     class_mock.return_value = api
-    api.info.return_value = TestClass(name="my_name", type=TestTypeEnum.TYPE1)
+    api.async_info.return_value = TestClass(name="my_name", type=TestTypeEnum.TYPE1)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -74,7 +78,7 @@ def test_open_with_stdin_password(getpass: Mock, class_mock: Mock) -> None:
     """Test open door."""
     api = MagicMock(spec=GogoGate2Api)
     class_mock.return_value = api
-    api.open_door.return_value = True
+    api.async_open_door.return_value = True
 
     getpass.return_value = "my_password"
 
@@ -104,7 +108,7 @@ def test_close_without_password_option(getpass: Mock, class_mock: Mock) -> None:
     """Test close door."""
     api = MagicMock(spec=ISmartGateApi)
     class_mock.return_value = api
-    api.close_door.return_value = False
+    api.async_close_door.return_value = False
 
     getpass.return_value = "my_password"
 
