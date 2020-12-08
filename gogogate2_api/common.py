@@ -1,9 +1,10 @@
 """Common code for gate APIs."""
 import dataclasses
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 import json
-from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, FrozenSet, Optional, Tuple, Type, TypeVar, Union, cast
 from xml.etree.ElementTree import Element  # nosec
 
 from typing_extensions import Final
@@ -181,6 +182,24 @@ class DoorStatus(Enum):
     UNDEFINED = "undefined"
 
 
+class TransitionDoorStatus(Enum):
+    """Presumed door status."""
+
+    OPENING = "opening"
+    CLOSING = "closing"
+
+
+AllDoorStatus = Union[DoorStatus, TransitionDoorStatus]
+
+
+CLOSE_DOOR_STATUSES: Final[FrozenSet[AllDoorStatus]] = frozenset(
+    (DoorStatus.CLOSED, TransitionDoorStatus.CLOSING)
+)
+OPEN_DOOR_STATUSES: Final[FrozenSet[AllDoorStatus]] = frozenset(
+    (DoorStatus.OPENED, TransitionDoorStatus.OPENING)
+)
+
+
 class DoorMode(Enum):
     """Door mode."""
 
@@ -316,6 +335,16 @@ class ISmartGateInfoResponse(AbstractInfoResponse):
     door1: ISmartGateDoor
     door2: ISmartGateDoor
     door3: ISmartGateDoor
+
+
+@dataclass(frozen=True)
+class CachedTransitionDoorStatus:
+    """Cached persistent door status."""
+
+    door_id: int
+    activated: datetime
+    transition_status: TransitionDoorStatus
+    target_status: DoorStatus
 
 
 def element_or_none(element: Optional[Element], tag: str) -> Optional[Element]:
@@ -529,6 +558,18 @@ def get_door_by_id(
 def get_doors(response: AbstractInfoResponse) -> Tuple[AbstractDoor, ...]:
     """Get a tuple of doors from a response."""
     return (response.door1, response.door2, response.door3)
+
+
+def get_configured_door_by_id(
+    door_id: int, response: AbstractInfoResponse
+) -> Optional[AbstractDoor]:
+    """Get a door from a gogogate2 response."""
+    return next(
+        iter(
+            [door for door in get_configured_doors(response) if door.door_id == door_id]
+        ),
+        None,
+    )
 
 
 def get_configured_doors(response: AbstractInfoResponse) -> Tuple[AbstractDoor, ...]:
