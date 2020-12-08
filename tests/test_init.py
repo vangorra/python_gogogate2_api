@@ -1,13 +1,21 @@
 """Tets for main API."""
+from datetime import datetime
 from typing import Callable, Union
+from unittest.mock import Mock, patch
 
 from gogogate2_api import (
+    AbstractGateApi,
     GogoGate2Api,
     GogoGate2ApiCipher,
     ISmartGateApi,
     ISmartGateApiCipher,
 )
-from gogogate2_api.common import ApiError, DoorStatus, get_door_by_id
+from gogogate2_api.common import (
+    ApiError,
+    DoorStatus,
+    TransitionDoorStatus,
+    get_door_by_id,
+)
 from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 import pytest
 import requests
@@ -299,3 +307,82 @@ def test_sensor_temperature_and_voltage(
 
     assert response.door3.temperature == 16.3
     assert response.door3.voltage is None
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator"),
+    ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
+)
+@patch("gogogate2_api.datetime")
+@responses.activate
+# pylint: disable=too-many-statements
+def test_transitional_door_statuses(
+    datetime_mock: Mock, api_generator: ApiGenerator, server_generator: ServerGenerator
+) -> None:
+    """Test open and close door."""
+    api = api_generator("device1", "fakeuser", "fakepassword")
+    mock_server = server_generator(api)
+
+    # Test current status.
+    datetime_mock.utcnow.side_effect = datetime.utcnow
+    api._transition_door_status.clear()  # pylint: disable=protected-access
+    assert api.get_door_statuses() == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
+    assert api.get_door_statuses(use_transitional_status=True) == {
+        1: DoorStatus.CLOSED,
+        2: DoorStatus.OPENED,
+    }
+    assert api.get_door_statuses(use_transitional_status=False) == {
+        1: DoorStatus.CLOSED,
+        2: DoorStatus.OPENED,
+    }
+
+    # Test door is in the process of opening.
+    datetime_mock.utcnow.side_effect = datetime.utcnow
+    api._transition_door_status.clear()  # pylint: disable=protected-access
+    api.open_door(1)
+    mock_server.set_device_status(1, DoorStatus.CLOSED)
+    assert api.get_door_statuses() == {
+        1: TransitionDoorStatus.OPENING,
+        2: DoorStatus.OPENED,
+    }
+    assert api.get_door_statuses(use_transitional_status=True) == {
+        1: TransitionDoorStatus.OPENING,
+        2: DoorStatus.OPENED,
+    }
+    assert api.get_door_statuses(use_transitional_status=False) == {
+        1: DoorStatus.CLOSED,
+        2: DoorStatus.OPENED,
+    }
+
+    # Door is open before the transitional cache timeout.
+    datetime_mock.utcnow.side_effect = datetime.utcnow
+    api._transition_door_status.clear()  # pylint: disable=protected-access
+    api.open_door(1)
+    assert api.get_door_statuses() == {1: DoorStatus.OPENED, 2: DoorStatus.OPENED}
+    assert api.get_door_statuses(use_transitional_status=True) == {
+        1: DoorStatus.OPENED,
+        2: DoorStatus.OPENED,
+    }
+    assert api.get_door_statuses(use_transitional_status=False) == {
+        1: DoorStatus.OPENED,
+        2: DoorStatus.OPENED,
+    }
+
+    # Door remains closed after the transitional cache timeout.
+    datetime_mock.utcnow.side_effect = datetime.utcnow
+    api._transition_door_status.clear()  # pylint: disable=protected-access
+    mock_server.set_device_status(1, DoorStatus.CLOSED)
+    api.open_door(1)
+    mock_server.set_device_status(1, DoorStatus.CLOSED)
+    datetime_mock.utcnow.side_effect = (
+        lambda: datetime.utcnow() + AbstractGateApi.DEFAULT_TRANSITION_STATUS_TIMEOUT
+    )
+    assert api.get_door_statuses() == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
+    assert api.get_door_statuses(use_transitional_status=True) == {
+        1: DoorStatus.CLOSED,
+        2: DoorStatus.OPENED,
+    }
+    assert api.get_door_statuses(use_transitional_status=False) == {
+        1: DoorStatus.CLOSED,
+        2: DoorStatus.OPENED,
+    }
