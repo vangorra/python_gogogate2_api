@@ -1,5 +1,7 @@
 """CLI for gate devices."""
+import asyncio
 from enum import Enum, unique
+from functools import wraps
 from getpass import getpass
 import json
 import pprint
@@ -14,6 +16,16 @@ from .common import EnhancedJSONEncoder
 API: Final[str] = "api"
 DEVICE_TYPE: Final[str] = "device_type"
 PRETTY_PRINT: Final[pprint.PrettyPrinter] = pprint.PrettyPrinter(indent=4)
+
+
+def coro(func: Callable) -> Any:
+    """Wrap a coroutine in a async runner."""
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        return asyncio.run(func(*args, **kwargs))
+
+    return wrapper
 
 
 def _echo_response(obj: Any) -> None:
@@ -100,25 +112,28 @@ def cli(
 
 @cli.command(name=Command.INFO.value)
 @click.pass_context
-def info(ctx: click.core.Context) -> None:
+@coro
+async def info(ctx: click.core.Context) -> None:
     """Get info from device."""
-    _echo_response(get_context_api(ctx).info())
+    _echo_response(await get_context_api(ctx).async_info())
 
 
 @cli.command(name=Command.OPEN.value)
 @click.argument(DoorArgument.DOOR_ID.value, type=int, required=True)
 @click.pass_context
-def open_door(ctx: click.core.Context, door_id: int) -> None:
+@coro
+async def open_door(ctx: click.core.Context, door_id: int) -> None:
     """Open the door."""
-    _echo_response(get_context_api(ctx).open_door(door_id))
+    _echo_response(await get_context_api(ctx).async_open_door(door_id))
 
 
 @cli.command(name=Command.CLOSE.value)
 @click.argument(DoorArgument.DOOR_ID.value, type=int, required=True)
 @click.pass_context
-def close_door(ctx: click.core.Context, door_id: int) -> None:
+@coro
+async def close_door(ctx: click.core.Context, door_id: int) -> None:
     """Close the door."""
-    _echo_response(get_context_api(ctx).close_door(door_id))
+    _echo_response(await get_context_api(ctx).async_close_door(door_id))
 
 
 def cli_with_defaults(device_type: DeviceType) -> None:

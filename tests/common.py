@@ -2,7 +2,7 @@
 import abc
 import json
 from typing import Any, Generic, List, Optional, TypeVar, Union
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs
 from xml.dom.minidom import parseString
 
 import dicttoxml
@@ -21,7 +21,8 @@ from gogogate2_api.common import (
     Wifi,
 )
 from gogogate2_api.const import NONE_INT, GogoGate2ApiErrorCode, ISmartGateApiErrorCode
-import responses
+from httpx import Request, Response
+import respx
 from typing_extensions import Final
 
 MockInfoResponse = TypeVar(
@@ -51,11 +52,9 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
             json.dumps(self._get_info_data(), indent=2, cls=EnhancedJSONEncoder)
         )
 
-        responses.reset()
-        responses.add_callback(
-            responses.GET,
-            AbstractGateApi.API_URL_TEMPLATE % self.host,
-            callback=self._handle_request,
+        respx.reset()
+        respx.get(AbstractGateApi.API_URL_TEMPLATE % self.host).mock(
+            side_effect=self._handle_request
         )
 
     @abc.abstractmethod
@@ -63,39 +62,39 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         pass
 
     @abc.abstractmethod
-    def _get_error_corrupted_data_response(self) -> tuple:
+    def _get_error_corrupted_data_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_token_not_set_response(self) -> tuple:
+    def _get_error_token_not_set_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_invalid_token_response(self) -> tuple:
+    def _get_error_invalid_token_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_absent_credentials_response(self) -> tuple:
+    def _get_error_absent_credentials_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_invalid_credentials_response(self) -> tuple:
+    def _get_error_invalid_credentials_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_invalid_option_response(self) -> tuple:
+    def _get_error_invalid_option_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_activate_invalid_api_code_response(self) -> tuple:
+    def _get_error_activate_invalid_api_code_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_activate_door_id_not_set_response(self) -> tuple:
+    def _get_error_activate_door_id_not_set_response(self) -> Response:
         pass
 
     @abc.abstractmethod
-    def _get_error_activate_invalid_door_response(self) -> tuple:
+    def _get_error_activate_invalid_door_response(self) -> Response:
         pass
 
     def set_device_status(self, door_id: int, door_status: DoorStatus) -> None:
@@ -107,14 +106,14 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         self._info_data[name] = value
 
     # pylint: disable=too-many-return-statements
-    def _handle_request(self, request: Any) -> tuple:
+    def _handle_request(self, request: Request) -> Response:
         # Simulate an HTTP error.
         if self.http_status != 200:
             return self._new_response("")
 
         # Parse the request.
-        query: Final[dict] = parse_qs(urlparse(request.url).query)
-        data: Final[str] = query["data"][0]
+        query: Final = parse_qs(request.url.query)
+        data: Final = query[b"data"][0].decode()
 
         try:
             decrypted: Final[str] = self.cipher.decrypt(data)
@@ -131,11 +130,11 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         # Maybe validate token.
         if isinstance(self.cipher, ISmartGateApiCipher):
 
-            if "token" not in query:
+            if b"token" not in query:
                 return self._get_error_token_not_set_response()
 
             # API returns invalid credentials when token is wrong
-            token: Final[str] = query["token"][0]
+            token: Final[str] = query[b"token"][0].decode()
             if token != self.cipher.token:
                 return self._get_error_invalid_token_response()
 
@@ -157,10 +156,10 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
 
         return self._okay_response()
 
-    def _okay_response(self) -> tuple:
+    def _okay_response(self) -> Response:
         return self._new_response({"result": "OK"})
 
-    def _activate_response(self, door_id: str, api_code: str) -> tuple:
+    def _activate_response(self, door_id: str, api_code: str) -> Response:
         if api_code != self.api_code:
             return self._get_error_activate_invalid_api_code_response()
 
@@ -183,24 +182,23 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
 
         return self._okay_response()
 
-    def _info_response(self) -> tuple:
+    def _info_response(self) -> Response:
         return self._new_response(self._info_data)
 
-    def _error_response(self, code: int, message: str) -> tuple:
+    def _error_response(self, code: int, message: str) -> Response:
         return self._new_response(
             {"error": {"errorcode": code, "errormsg": f"Code: {code} - {message}"}},
             encrypt=False,
         )
 
-    def _new_response(self, data: Any, encrypt: bool = True) -> tuple:
+    def _new_response(self, data: Any, encrypt: bool = True) -> Response:
         xml_str = parseString(
             dicttoxml.dicttoxml(data, custom_root="response", attr_type=False)
         ).toprettyxml()
 
-        return (
+        return Response(
             self.http_status,
-            {},
-            self.cipher.encrypt(xml_str) if encrypt else xml_str,
+            content=self.cipher.encrypt(xml_str) if encrypt else xml_str,
         )
 
 
@@ -264,49 +262,49 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
             wifi=Wifi(SSID="Wifi network", linkquality="80%", signal="20"),
         )
 
-    def _get_error_corrupted_data_response(self) -> tuple:
+    def _get_error_corrupted_data_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.CORRUPTED_DATA.value, "Error: corrupted data"
         )
 
-    def _get_error_invalid_token_response(self) -> tuple:
+    def _get_error_invalid_token_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.INVALID_TOKEN.value, "Error: invalid token",
         )
 
-    def _get_error_token_not_set_response(self) -> tuple:
+    def _get_error_token_not_set_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.TOKEN_NOT_SET.value, "Error: token not set",
         )
 
-    def _get_error_absent_credentials_response(self) -> tuple:
+    def _get_error_absent_credentials_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.CREDENTIALS_NOT_SET.value,
             "Error: login or password not set",
         )
 
-    def _get_error_invalid_credentials_response(self) -> tuple:
+    def _get_error_invalid_credentials_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.CREDENTIALS_INCORRECT.value,
             "Error: wrong login or password",
         )
 
-    def _get_error_invalid_option_response(self) -> tuple:
+    def _get_error_invalid_option_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.INVALID_OPTION.value, "Error: invalid option"
         )
 
-    def _get_error_activate_invalid_api_code_response(self) -> tuple:
+    def _get_error_activate_invalid_api_code_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.INVALID_API_CODE.value, "Error: invalid API code"
         )
 
-    def _get_error_activate_door_id_not_set_response(self) -> tuple:
+    def _get_error_activate_door_id_not_set_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.DOOR_NOT_SET.value, "Error: door not set"
         )
 
-    def _get_error_activate_invalid_door_response(self) -> tuple:
+    def _get_error_activate_invalid_door_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.INVALID_DOOR.value, "Error: invalid door"
         )
@@ -382,49 +380,49 @@ class MockISmartGateServer(AbstractMockServer[ISmartGateInfoResponse]):
             wifi=Wifi(SSID="Wifi network", linkquality="80%", signal="20"),
         )
 
-    def _get_error_corrupted_data_response(self) -> tuple:
+    def _get_error_corrupted_data_response(self) -> Response:
         return self._error_response(
             GogoGate2ApiErrorCode.CORRUPTED_DATA.value, "Error: corrupted data"
         )
 
-    def _get_error_invalid_token_response(self) -> tuple:
+    def _get_error_invalid_token_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.INVALID_TOKEN.value, "Error: invalid token",
         )
 
-    def _get_error_token_not_set_response(self) -> tuple:
+    def _get_error_token_not_set_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.TOKEN_NOT_SET.value, "Error: token not set",
         )
 
-    def _get_error_absent_credentials_response(self) -> tuple:
+    def _get_error_absent_credentials_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.CREDENTIALS_NOT_SET.value,
             "Error: login or password not set",
         )
 
-    def _get_error_invalid_credentials_response(self) -> tuple:
+    def _get_error_invalid_credentials_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.CREDENTIALS_INCORRECT.value,
             "Error: wrong login or password",
         )
 
-    def _get_error_invalid_option_response(self) -> tuple:
+    def _get_error_invalid_option_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.INVALID_OPTION.value, "Error: invalid option"
         )
 
-    def _get_error_activate_invalid_api_code_response(self) -> tuple:
+    def _get_error_activate_invalid_api_code_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.INVALID_API_CODE.value, "Error: invalid API code"
         )
 
-    def _get_error_activate_door_id_not_set_response(self) -> tuple:
+    def _get_error_activate_door_id_not_set_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.DOOR_NOT_SET.value, "Error: door not set"
         )
 
-    def _get_error_activate_invalid_door_response(self) -> tuple:
+    def _get_error_activate_invalid_door_response(self) -> Response:
         return self._error_response(
             ISmartGateApiErrorCode.INVALID_DOOR.value, "Error: invalid door"
         )

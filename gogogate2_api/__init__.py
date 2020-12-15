@@ -12,8 +12,7 @@ from xml.etree.ElementTree import Element  # nosec
 from Crypto.Cipher import AES  # nosec
 from Crypto.Cipher._mode_cbc import CbcMode  # nosec
 from defusedxml import ElementTree
-import requests
-from requests import Response
+from httpx import AsyncClient
 from typing_extensions import Final
 
 from .common import (
@@ -195,7 +194,7 @@ class AbstractGateApi(
         """Get the cipher."""
         return self._cipher
 
-    def _request(
+    async def _async_request(
         self,
         option: RequestOption,
         arg1: Optional[str] = None,
@@ -211,20 +210,21 @@ class AbstractGateApi(
             )
         )
 
-        response: Final[Response] = requests.get(
-            self._api_url,
-            params={
-                "data": self._cipher.encrypt(command_str),
-                **self._get_extra_url_params(),
-            },
-            timeout=self._request_timeout.seconds,
-        )
+        async with AsyncClient() as client:
+            response: Final = await client.get(
+                self._api_url,
+                params={
+                    "data": self._cipher.encrypt(command_str),
+                    **self._get_extra_url_params(),
+                },
+                timeout=self._request_timeout.seconds,
+            )
         response_raw: Final[str] = response.content.decode("utf-8")
 
         try:
             # Error messages are returned unencrypted so we try to decrypt the response.
             # if that fails, then we use what was returned.
-            response_text = self._cipher.decrypt(response.content.decode("utf-8"))
+            response_text = self._cipher.decrypt(response_raw)
         except ValueError:
             response_text = response_raw
 
@@ -240,11 +240,11 @@ class AbstractGateApi(
         return root_element
 
     @abc.abstractmethod
-    def info(self) -> InfoResponseType:
+    async def async_info(self) -> InfoResponseType:
         """Get info about the device and doors."""
 
     @abc.abstractmethod
-    def activate(self, door_id: int) -> ActivateResponseType:
+    async def async_activate(self, door_id: int) -> ActivateResponseType:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
@@ -265,11 +265,11 @@ class AbstractGateApi(
     def _get_extra_url_params(self) -> Dict[str, str]:
         return {}
 
-    def _info(self) -> Element:
+    async def _async_info(self) -> Element:
         """Get info about the device and doors."""
-        return self._request(RequestOption.INFO)
+        return await self._async_request(RequestOption.INFO)
 
-    def _activate(
+    async def _async_activate(
         self, door_id: int, info: Optional[InfoResponseType] = None
     ) -> Element:
         """Send a command to open/close/stop the door.
@@ -278,13 +278,15 @@ class AbstractGateApi(
         running this method during an action will stop the door. It's
         recommended you use open_door() or close_door() as those methods check
         the status before running and run if needed."""
-        return self._request(
+        return await self._async_request(
             RequestOption.ACTIVATE,
             str(door_id),
-            self._get_activate_api_code(info if info else self.info(), door_id),
+            self._get_activate_api_code(
+                info if info else await self.async_info(), door_id
+            ),
         )
 
-    def _set_door_status(
+    async def _async_set_door_status(
         self,
         door_id: int,
         target_door_status: DoorStatus,
@@ -295,7 +297,7 @@ class AbstractGateApi(
             return False
 
         # Get current door status.
-        info: Final[InfoResponseType] = self.info()
+        info: Final[InfoResponseType] = await self.async_info()
         statuses: Final = self._get_door_statuses(
             info, use_transitional_status=consider_transitional_states
         )
@@ -307,7 +309,7 @@ class AbstractGateApi(
         if not current_door_status or current_door_status in result_door_statuses:
             return False
 
-        self._activate(door_id, info)
+        await self._async_activate(door_id, info)
 
         # Set the transitional status.
         self._transition_door_status[door_id] = CachedTransitionDoorStatus(
@@ -319,27 +321,27 @@ class AbstractGateApi(
 
         return True
 
-    def close_door(
+    async def async_close_door(
         self, door_id: int, consider_transitional_states: bool = True
     ) -> bool:
         """Close a door.
 
         :return True if close command sent, False otherwise.
         """
-        return self._set_door_status(
+        return await self._async_set_door_status(
             door_id,
             DoorStatus.CLOSED,
             consider_transitional_states=consider_transitional_states,
         )
 
-    def open_door(
+    async def async_open_door(
         self, door_id: int, consider_transitional_states: bool = True
     ) -> bool:
         """Open a door.
 
         :return True if open command sent, False otherwise.
         """
-        return self._set_door_status(
+        return await self._async_set_door_status(
             door_id,
             DoorStatus.OPENED,
             consider_transitional_states=consider_transitional_states,
@@ -375,12 +377,12 @@ class AbstractGateApi(
 
         return result
 
-    def get_door_statuses(
+    async def async_get_door_statuses(
         self, use_transitional_status: bool = True
     ) -> Dict[int, AllDoorStatus]:
         """Get configured door statuses."""
         return self._get_door_statuses(
-            self.info(), use_transitional_status=use_transitional_status
+            await self.async_info(), use_transitional_status=use_transitional_status
         )
 
 
@@ -409,18 +411,20 @@ class ISmartGateApi(
             transition_status_timeout=transition_status_timeout,
         )
 
-    def info(self) -> ISmartGateInfoResponse:
+    async def async_info(self) -> ISmartGateInfoResponse:
         """Get info about the device and doors."""
-        return element_to_ismartgate_info_response(self._info())
+        return element_to_ismartgate_info_response(await self._async_info())
 
-    def activate(self, door_id: int) -> ISmartGateActivateResponse:
+    async def async_activate(self, door_id: int) -> ISmartGateActivateResponse:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        return element_to_ismartgate_activate_response(self._activate(door_id))
+        return element_to_ismartgate_activate_response(
+            await self._async_activate(door_id)
+        )
 
     #  pylint: disable=no-self-use
     def _get_activate_api_code(self, info: ISmartGateInfoResponse, door_id: int) -> str:
@@ -475,18 +479,20 @@ class GogoGate2Api(
             transition_status_timeout=transition_status_timeout,
         )
 
-    def info(self) -> GogoGate2InfoResponse:
+    async def async_info(self) -> GogoGate2InfoResponse:
         """Get info about the device and doors."""
-        return element_to_gogogate2_info_response(self._info())
+        return element_to_gogogate2_info_response(await self._async_info())
 
-    def activate(self, door_id: int) -> GogoGate2ActivateResponse:
+    async def async_activate(self, door_id: int) -> GogoGate2ActivateResponse:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
         this method during an action will stop the door. It's recommended you
         use open_door() or close_door() as those methods check the status
         before running and run if needed."""
-        return element_to_gogogate2_activate_response(self._activate(door_id))
+        return element_to_gogogate2_activate_response(
+            await self._async_activate(door_id)
+        )
 
     @staticmethod
     def _get_exception_map() -> Dict[int, ExceptionGenerator]:
