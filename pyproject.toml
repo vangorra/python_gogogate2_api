@@ -49,6 +49,7 @@ wheel = "==0.33.6"  # Needed for successful compile of other modules.
 respx = "^0.16.3"
 pytest-asyncio = "^0.14.0"
 asyncmock = "^0.4.2"
+asynctest = "^0.13.0"
 
 
 [tool.black]
