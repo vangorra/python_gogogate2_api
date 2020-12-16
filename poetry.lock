@@ -25,17 +25,6 @@ version = ">=1.4.0,<1.5"
 
 [[package]]
 category = "dev"
-description = "Extension to the standard mock framework to support support async"
-name = "asyncmock"
-optional = false
-python-versions = ">=3.6"
-version = "0.4.2"
-
-[package.dependencies]
-mock = "*"
-
-[[package]]
-category = "dev"
 description = "Enhance the standard unittest package with features for testing asyncio libraries"
 name = "asynctest"
 optional = false
@@ -358,19 +347,6 @@ name = "mccabe"
 optional = false
 python-versions = "*"
 version = "0.6.1"
-
-[[package]]
-category = "dev"
-description = "Rolling backport of unittest.mock for all Pythons"
-name = "mock"
-optional = false
-python-versions = ">=3.6"
-version = "4.0.3"
-
-[package.extras]
-build = ["twine", "wheel", "blurb"]
-docs = ["sphinx"]
-test = ["pytest (<5.4)", "pytest-cov"]
 
 [[package]]
 category = "dev"
@@ -749,7 +725,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "5e16e14666f8da2de4fdeb3b06a7d71ee75170a061734f3957c40eacbb34aa34"
+content-hash = "7fd4109a1d046396cf98f4436496c8b240f9cba4f7472c4dbac11afbee3dfe01"
 lock-version = "1.0"
 python-versions = ">=3.6, <4"
 
@@ -761,10 +737,6 @@ appdirs = [
 astroid = [
     {file = "astroid-2.4.2-py3-none-any.whl", hash = "sha256:bc58d83eb610252fd8de6363e39d4f1d0619c894b0ed24603b881c02e64c7386"},
     {file = "astroid-2.4.2.tar.gz", hash = "sha256:2f4078c2a41bf377eea06d71c9d2ba4eb8f6b1af2135bec27bbbb7d8f12bb703"},
-]
-asyncmock = [
-    {file = "asyncmock-0.4.2-py3-none-any.whl", hash = "sha256:fd8bc4e7813251a8959d1140924ccba3adbbc7af885dba7047c67f73c0b664b1"},
-    {file = "asyncmock-0.4.2.tar.gz", hash = "sha256:c251889d542e98fe5f7ece2b5b8643b7d62b50a5657d34a4cbce8a1d5170d750"},
 ]
 asynctest = [
     {file = "asynctest-0.13.0-py3-none-any.whl", hash = "sha256:5da6118a7e6d6b54d83a8f7197769d046922a44d2a99c21382f0a6e4fadae676"},
@@ -940,10 +912,6 @@ lazy-object-proxy = [
 mccabe = [
     {file = "mccabe-0.6.1-py2.py3-none-any.whl", hash = "sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42"},
     {file = "mccabe-0.6.1.tar.gz", hash = "sha256:dd8d182285a0fe56bace7f45b5e7d1a6ebcbf524e8f3bd87eb0f125271b8831f"},
-]
-mock = [
-    {file = "mock-4.0.3-py3-none-any.whl", hash = "sha256:122fcb64ee37cfad5b3f48d7a7d51875d7031aaf3d8be7c42e2bee25044eee62"},
-    {file = "mock-4.0.3.tar.gz", hash = "sha256:7d3fbbde18228f4ff2f1f119a45cdffa458b4c0dee32eb4d2bb2f82554bac7bc"},
 ]
 more-itertools = [
     {file = "more-itertools-8.5.0.tar.gz", hash = "sha256:6f83822ae94818eae2612063a5101a7311e68ae8002005b5e05f03fd74a86a20"},
