@@ -1,5 +1,6 @@
 """Constants for gate devices"""
 from enum import IntEnum
+from typing_extensions import Final
 
 
 class GogoGate2ApiErrorCode(IntEnum):
@@ -35,4 +36,4 @@ class ISmartGateApiErrorCode(IntEnum):
     CORRUPTED_DATA = 999
 
 
-NONE_INT = -100000
+NONE_INT: Final = -100000

@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Callable, Union
 from unittest.mock import patch
 
+from typing_extensions import Final
+
 from gogogate2_api import (
     AbstractGateApi,
     GogoGate2Api,
@@ -15,6 +17,7 @@ from gogogate2_api.common import (
     DoorStatus,
     TransitionDoorStatus,
     get_door_by_id,
+    InvalidDoorException,
 )
 from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 import pytest
@@ -43,10 +46,10 @@ def test_ismartgate_token() -> None:
 
 def test_ismartgate_encrypt_decrypt() -> None:
     """Test encrypt/decrypt."""
-    cipher = ISmartGateApiCipher("admin", "password")
+    cipher: Final = ISmartGateApiCipher("admin", "password")
 
     # Test encrypted contents matches exactly and can be decrypted.
-    enc = cipher.encrypt(
+    enc: Final = cipher.encrypt(
         '["admin", "notRealPassword", "info", "", ""]', init_vector="497c04879e0d26af"
     )
     assert (
@@ -66,10 +69,10 @@ def test_ismartgate_encrypt_decrypt() -> None:
 
 def test_gogogate2_cipher() -> None:
     """Test encrypt/decrypt."""
-    cipher = GogoGate2ApiCipher()
+    cipher: Final = GogoGate2ApiCipher()
 
     # Test encrypted contents matches exactly and can be decrypted.
-    enc = cipher.encrypt(
+    enc: Final = cipher.encrypt(
         '["admin", "notRealPassword", "info", "", ""]', init_vector="497c04879e0d26af"
     )
     assert (
@@ -109,7 +112,7 @@ async def test_api_invalid_credentials(
 ) -> None:
     """Test invalid credentials error."""
     # Incorrect username/password.
-    api: ApiType = api_generator("device1", "fakeuser", "fakepassword")
+    api: Final = api_generator("device1", "fakeuser", "fakepassword")
     server_generator(api, username="fakeuser1", password="fakepassword2")
     with pytest.raises(ApiError) as exinfo:
         await api.async_info()
@@ -126,7 +129,7 @@ async def test_activate(
     api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test activate."""
-    api = api_generator("device1", "fakeuser", "fakepassword")
+    api: Final = api_generator("device1", "fakeuser", "fakepassword")
     server_generator(api)
 
     response = await api.async_activate(1)
@@ -145,7 +148,7 @@ async def test_open_and_close_door(
     api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
-    api = api_generator("device1", "fakeuser", "fakepassword")
+    api: Final = api_generator("device1", "fakeuser", "fakepassword")
     server_generator(api)
 
     # Initial info.
@@ -254,8 +257,8 @@ async def test_remoteaccess(
     api_generator: ApiGenerator, server_generator: ServerGenerator, true_value: str
 ) -> None:
     """Test open and close door."""
-    api = api_generator("device1", "fakeuser", "fakepassword")
-    server = server_generator(api)
+    api: Final = api_generator("device1", "fakeuser", "fakepassword")
+    server: Final = server_generator(api)
 
     server.set_info_value("remoteaccessenabled", "false")
     assert not (await api.async_info()).remoteaccessenabled
@@ -283,11 +286,11 @@ async def test_sensor_temperature_and_voltage(
     api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
-    api = api_generator("device1", "fakeuser", "fakepassword")
+    api: Final = api_generator("device1", "fakeuser", "fakepassword")
     server_generator(api)
 
     # Initial info.
-    response = await api.async_info()
+    response: Final = await api.async_info()
     assert response.door1.temperature == 16.3
     assert response.door1.voltage == 40
 
@@ -300,10 +303,7 @@ async def test_sensor_temperature_and_voltage(
 
 @pytest.mark.parametrize(
     ("api_generator", "server_generator"),
-    (
-        (GogoGate2Api, MockGogoGate2Server),
-        # (ISmartGateApi, MockISmartGateServer)
-    ),
+    ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
 )
 @pytest.mark.asyncio
 @respx.mock
@@ -313,8 +313,8 @@ async def test_transitional_door_statuses(
 ) -> None:
     """Test open and close door."""
     with patch("gogogate2_api.datetime") as datetime_mock:
-        api = api_generator("device1", "fakeuser", "fakepassword")
-        mock_server = server_generator(api)
+        api: Final = api_generator("device1", "fakeuser", "fakepassword")
+        mock_server: Final = server_generator(api)
 
         # Test current status.
         datetime_mock.utcnow.side_effect = datetime.utcnow
@@ -389,3 +389,20 @@ async def test_transitional_door_statuses(
             1: DoorStatus.CLOSED,
             2: DoorStatus.OPENED,
         }
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator"), ((ISmartGateApi, MockISmartGateServer),),
+)
+@pytest.mark.asyncio
+@respx.mock
+# pylint: disable=too-many-statements
+async def test_ismartgate_activate_invalid_door(
+    api_generator: ApiGenerator, server_generator: ServerGenerator
+) -> None:
+    """Test invalid door exception when calling activate for ismartgate."""
+    api: Final = api_generator("device1", "fakeuser", "fakepassword")
+    server_generator(api)
+
+    with pytest.raises(InvalidDoorException):
+        await api.async_activate(5)

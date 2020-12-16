@@ -1,12 +1,12 @@
 """Common test code."""
 import abc
 import json
-from typing import Any, Generic, List, Optional, TypeVar, Union
+from typing import Any, Generic, Optional, TypeVar, Union
 from urllib.parse import parse_qs
 from xml.dom.minidom import parseString
 
 import dicttoxml
-from gogogate2_api import AbstractGateApi, ApiCipher, ISmartGateApiCipher
+from gogogate2_api import AbstractGateApi, ISmartGateApiCipher
 from gogogate2_api.common import (
     DoorMode,
     DoorStatus,
@@ -42,12 +42,12 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         password: Optional[str] = None,
     ):
         """Init object."""
-        self.host: Final[str] = host or api.host
-        self.username: Final[str] = username or api.username
-        self.password: Final[str] = password or api.password
-        self.api_code: Final[str] = api_code
-        self.http_status: Final[int] = 200
-        self.cipher: Final[ApiCipher] = api.cipher
+        self.host: Final = host or api.host
+        self.username: Final = username or api.username
+        self.password: Final = password or api.password
+        self.api_code: Final = api_code
+        self.http_status: Final = 200
+        self.cipher: Final = api.cipher
         self._info_data: dict = json.loads(
             json.dumps(self._get_info_data(), indent=2, cls=EnhancedJSONEncoder)
         )
@@ -116,13 +116,13 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         data: Final = query[b"data"][0].decode()
 
         try:
-            decrypted: Final[str] = self.cipher.decrypt(data)
-            payload: Final[List[str]] = json.loads(decrypted)
-            username: Final[str] = payload[0]
-            password: Final[str] = payload[1]
-            option: Final[str] = payload[2]
-            arg1: Final[str] = payload[3]
-            arg2: Final[str] = payload[4]
+            decrypted: Final = self.cipher.decrypt(data)
+            payload: Final = json.loads(decrypted)
+            username: Final = payload[0]
+            password: Final = payload[1]
+            option: Final = payload[2]
+            arg1: Final = payload[3]
+            arg2: Final = payload[4]
         except Exception as ex:  # pylint: disable=broad-except
             print(ex)
             return self._get_error_corrupted_data_response()
@@ -134,7 +134,7 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
                 return self._get_error_token_not_set_response()
 
             # API returns invalid credentials when token is wrong
-            token: Final[str] = query[b"token"][0].decode()
+            token: Final = query[b"token"][0].decode()
             if token != self.cipher.token:
                 return self._get_error_invalid_token_response()
 
@@ -166,7 +166,7 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
         if not door_id.isdigit():
             return self._get_error_activate_door_id_not_set_response()
 
-        door: Final[dict] = self._info_data[f"door{door_id}"]
+        door: Final = self._info_data[f"door{door_id}"]
         if not door:
             return self._get_error_activate_invalid_door_response()
 

@@ -13,9 +13,9 @@ from typing_extensions import Final
 from . import AbstractGateApi, GogoGate2Api, ISmartGateApi
 from .common import EnhancedJSONEncoder
 
-API: Final[str] = "api"
-DEVICE_TYPE: Final[str] = "device_type"
-PRETTY_PRINT: Final[pprint.PrettyPrinter] = pprint.PrettyPrinter(indent=4)
+API: Final = "api"
+DEVICE_TYPE: Final = "device_type"
+PRETTY_PRINT: Final = pprint.PrettyPrinter(indent=4)
 
 
 def coro(func: Callable) -> Any:

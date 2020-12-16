@@ -7,6 +7,8 @@ from typing import Callable
 
 from asynctest import MagicMock, Mock, patch
 from click.testing import CliRunner
+from typing_extensions import Final
+
 from gogogate2_api import GogoGate2Api, ISmartGateApi
 import gogogate2_api.cli as cli_module
 from gogogate2_api.cli import (
@@ -20,7 +22,7 @@ from gogogate2_api.cli import (
 import pytest
 
 
-class TestTypeEnum(Enum):
+class StubbedTypeEnum(Enum):
     """Test enum."""
 
     TYPE1 = "type1"
@@ -28,21 +30,23 @@ class TestTypeEnum(Enum):
 
 
 @dataclass
-class TestClass:
+class StubbedClassData:
     """Test data class."""
 
     name: str
-    type: TestTypeEnum
+    type: StubbedTypeEnum
 
 
 @patch("gogogate2_api.cli.GogoGate2Api")
 def test_info(class_mock: Mock) -> None:
     """Test get device info."""
-    api = MagicMock(spec=GogoGate2Api)
+    api: Final = MagicMock(spec=GogoGate2Api)
     class_mock.return_value = api
-    api.async_info.return_value = TestClass(name="my_name", type=TestTypeEnum.TYPE1)
+    api.async_info.return_value = StubbedClassData(
+        name="my_name", type=StubbedTypeEnum.TYPE1
+    )
 
-    runner = CliRunner()
+    runner: Final = CliRunner()
     result = runner.invoke(
         cli,
         (
@@ -72,13 +76,13 @@ def test_info(class_mock: Mock) -> None:
 @patch("gogogate2_api.cli.getpass")
 def test_open_with_stdin_password(getpass: Mock, class_mock: Mock) -> None:
     """Test open door."""
-    api = MagicMock(spec=GogoGate2Api)
+    api: Final = MagicMock(spec=GogoGate2Api)
     class_mock.return_value = api
     api.async_open_door.return_value = True
 
     getpass.return_value = "my_password"
 
-    runner = CliRunner()
+    runner: Final = CliRunner()
     result = runner.invoke(
         cli,
         (
@@ -102,13 +106,13 @@ def test_open_with_stdin_password(getpass: Mock, class_mock: Mock) -> None:
 @patch("gogogate2_api.cli.getpass")
 def test_close_without_password_option(getpass: Mock, class_mock: Mock) -> None:
     """Test close door."""
-    api = MagicMock(spec=ISmartGateApi)
+    api: Final = MagicMock(spec=ISmartGateApi)
     class_mock.return_value = api
     api.async_close_door.return_value = False
 
     getpass.return_value = "my_password"
 
-    runner = CliRunner()
+    runner: Final = CliRunner()
     result = runner.invoke(
         cli,
         args=(

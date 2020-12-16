@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 import json
-from typing import Any, Callable, FrozenSet, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, Optional, Tuple, Type, TypeVar, Union, cast
 from xml.etree.ElementTree import Element  # nosec
 
 from typing_extensions import Final
@@ -14,12 +14,20 @@ from .const import NONE_INT
 GenericType = TypeVar("GenericType")
 
 
+class InvalidDoorException(Exception):
+    """Exception when door is invalid."""
+
+    def __init__(self, door_id: int) -> None:
+        super().__init__(f"Door with id {door_id} not found.")
+        self.door_id: Final = door_id
+
+
 class TagException(Exception):
     """General exception for tags."""
 
     def __init__(self, tag: str, message: str) -> None:
         super().__init__(message)
-        self._tag: Final[str] = tag
+        self._tag: Final = tag
 
     @property
     def tag(self) -> str:
@@ -51,8 +59,8 @@ class UnexpectedTypeException(Exception):
         super().__init__(
             'Expected of "%s" to be "%s" but was "%s."' % (value, expected, type(value))
         )
-        self._value: Final[Any] = value
-        self._expected: Final[Type[GenericType]] = expected
+        self._value: Final = value
+        self._expected: Final = expected
 
     @property
     def value(self) -> Any:
@@ -137,8 +145,8 @@ class ApiError(Exception):
 
     def __init__(self, code: int, message: str) -> None:
         super().__init__(f"Code: {code} - {message}")
-        self._code: Final[int] = code
-        self._message: Final[str] = message
+        self._code: Final = code
+        self._message: Final = message
 
     @property
     def code(self) -> int:
@@ -171,7 +179,7 @@ class DoorNotSetException(ApiError):
     """Door not set exception."""
 
 
-ExceptionGenerator = Callable[[int, str], ApiError]
+ExceptionGenerator: Final = Callable[[int, str], ApiError]
 
 
 class DoorStatus(Enum):
@@ -189,15 +197,13 @@ class TransitionDoorStatus(Enum):
     CLOSING = "closing"
 
 
-AllDoorStatus = Union[DoorStatus, TransitionDoorStatus]
+AllDoorStatus: Final = Union[DoorStatus, TransitionDoorStatus]
 
 
-CLOSE_DOOR_STATUSES: Final[FrozenSet[AllDoorStatus]] = frozenset(
+CLOSE_DOOR_STATUSES: Final = frozenset(
     (DoorStatus.CLOSED, TransitionDoorStatus.CLOSING)
 )
-OPEN_DOOR_STATUSES: Final[FrozenSet[AllDoorStatus]] = frozenset(
-    (DoorStatus.OPENED, TransitionDoorStatus.OPENING)
-)
+OPEN_DOOR_STATUSES: Final = frozenset((DoorStatus.OPENED, TransitionDoorStatus.OPENING))
 
 
 class DoorMode(Enum):
@@ -354,7 +360,7 @@ def element_or_none(element: Optional[Element], tag: str) -> Optional[Element]:
 
 def element_or_raise(element: Optional[Element], tag: str) -> Element:
     """Get element from xml element."""
-    found_element: Final[Optional[Element]] = element_or_none(element, tag)
+    found_element: Final = element_or_none(element, tag)
     if found_element is None:
         raise TagNotFoundException(tag)
 
@@ -363,7 +369,7 @@ def element_or_raise(element: Optional[Element], tag: str) -> Element:
 
 def element_text_or_none(element: Optional[Element], tag: str) -> Optional[str]:
     """Get element text from xml element."""
-    found_element: Final[Optional[Element]] = element_or_none(element, tag)
+    found_element: Final = element_or_none(element, tag)
     return (
         None
         if found_element is None
@@ -375,7 +381,7 @@ def element_text_or_none(element: Optional[Element], tag: str) -> Optional[str]:
 
 def element_text_or_raise(element: Optional[Element], tag: str) -> str:
     """Get element text from xml element."""
-    found_element: Final[Element] = element_or_raise(element, tag)
+    found_element: Final = element_or_raise(element, tag)
     if found_element.text is None:
         raise TextEmptyException(tag)
 
@@ -384,7 +390,7 @@ def element_text_or_raise(element: Optional[Element], tag: str) -> str:
 
 def element_int_or_raise(element: Optional[Element], tag: str) -> int:
     """Get element int from xml element."""
-    found_element: Final[Element] = element_or_raise(element, tag)
+    found_element: Final = element_or_raise(element, tag)
     if found_element.text is None:
         raise TextEmptyException(tag)
 
@@ -424,12 +430,8 @@ def outputs_or_raise(element: Element) -> Outputs:
 
 def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
     """Get door from xml element."""
-    temp: Final[Optional[float]] = float_or_none(
-        element_text_or_none(element, "temperature")
-    )
-    voltage: Final[Optional[int]] = int_or_none(
-        element_text_or_none(element, "voltage")
-    )
+    temp: Final = float_or_none(element_text_or_none(element, "temperature"))
+    voltage: Final = int_or_none(element_text_or_none(element, "voltage"))
     return GogoGate2Door(
         door_id=door_id,
         permission=element_text_or_raise(element, "permission").lower() == "yes",
@@ -453,12 +455,8 @@ def gogogate2_door_or_raise(door_id: int, element: Element) -> GogoGate2Door:
 
 def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
     """Get door from xml element."""
-    temp: Final[Optional[float]] = float_or_none(
-        element_text_or_none(element, "temperature")
-    )
-    voltage: Final[Optional[int]] = int_or_none(
-        element_text_or_none(element, "voltage")
-    )
+    temp: Final = float_or_none(element_text_or_none(element, "temperature"))
+    voltage: Final = int_or_none(element_text_or_none(element, "voltage"))
     return ISmartGateDoor(
         door_id=door_id,
         enabled=element_text_or_raise(element, "enabled").lower() == "yes",

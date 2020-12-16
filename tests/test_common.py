@@ -1,6 +1,4 @@
 """Tests for common code."""
-from xml.etree.ElementTree import Element  # nosec
-
 from defusedxml import ElementTree
 from gogogate2_api.common import (
     DoorMode,
@@ -25,7 +23,7 @@ from typing_extensions import Final
 
 def test_element_exceptions() -> None:
     """Test exceptions thrown while parsing xml elements."""
-    root_element: Final[Element] = ElementTree.fromstring(
+    root_element: Final = ElementTree.fromstring(
         """
             <response>
                 <tag1></tag1>
@@ -68,7 +66,7 @@ def test_enum_or_raise() -> None:
 
 def test_get_enabled_doors() -> None:
     """Test get configurd doors."""
-    response: Final[GogoGate2InfoResponse] = GogoGate2InfoResponse(
+    response: Final = GogoGate2InfoResponse(
         user="user1",
         gogogatename="gogogatename1",
         model="",
