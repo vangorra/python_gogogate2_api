@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from hashlib import sha1
 import json
 import secrets
-from typing import Dict, Generic, Optional, Tuple, TypeVar, Union, cast
+from typing import Dict, Generic, Optional, TypeVar, Union, cast
 import uuid
 from xml.etree.ElementTree import Element  # nosec
 
@@ -18,7 +18,6 @@ from typing_extensions import Final
 from .common import (
     CLOSE_DOOR_STATUSES,
     OPEN_DOOR_STATUSES,
-    AbstractDoor,
     AllDoorStatus,
     ApiError,
     CachedTransitionDoorStatus,
@@ -43,6 +42,7 @@ from .common import (
     element_to_ismartgate_info_response,
     get_configured_doors,
     get_door_by_id,
+    InvalidDoorException,
 )
 from .const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 
@@ -52,28 +52,26 @@ class ApiCipher:
 
     def __init__(self, key: str) -> None:
         """Initialize the object."""
-        self._key: Final[str] = key
-        self._key_bytes: Final[bytes] = key.encode("utf-8")
+        self._key: Final = key
+        self._key_bytes: Final = key.encode("utf-8")
 
     def encrypt(self, content: str, init_vector: Optional[str] = None) -> str:
         """Encrypt content."""
-        init_vector_bytes: Final[bytes] = ApiCipher.pad_pkcs5(
+        init_vector_bytes: Final = ApiCipher.pad_pkcs5(
             init_vector or uuid.uuid4().hex
         ).encode("utf-8")[: AES.block_size]
-        content_bytes: Final[bytes] = ISmartGateApiCipher.pad_pkcs5(content).encode(
-            "utf-8"
-        )
-        cipher: Final[CbcMode] = cast(
+        content_bytes: Final = ISmartGateApiCipher.pad_pkcs5(content).encode("utf-8")
+        cipher: Final = cast(
             CbcMode, AES.new(self._key_bytes, AES.MODE_CBC, init_vector_bytes)
         )
-        encrypted_bytes: Final[bytes] = cipher.encrypt(content_bytes)
+        encrypted_bytes: Final = cipher.encrypt(content_bytes)
         return str(init_vector_bytes + base64.b64encode(encrypted_bytes), "utf-8")
 
     def decrypt(self, content: str) -> str:
         """Decrypt content."""
-        init_vector: Final[bytes] = content.encode("utf-8")[: AES.block_size]
-        encrypted_bytes: Final[bytes] = base64.b64decode(content[AES.block_size :])
-        cipher: Final[CbcMode] = cast(
+        init_vector: Final = content.encode("utf-8")[: AES.block_size]
+        encrypted_bytes: Final = base64.b64decode(content[AES.block_size :])
+        cipher: Final = cast(
             CbcMode, AES.new(self._key_bytes, AES.MODE_CBC, init_vector)
         )
         return ApiCipher.unpad_pkcs5(cipher.decrypt(encrypted_bytes)).decode("utf-8")
@@ -81,7 +79,7 @@ class ApiCipher:
     @staticmethod
     def pad_pkcs5(data: str) -> str:
         """Add padding to bytes."""
-        block_size: Final[int] = AES.block_size
+        block_size: Final = AES.block_size
         return data + (block_size - len(data) % block_size) * chr(
             block_size - len(data) % block_size
         )
@@ -95,7 +93,7 @@ class ApiCipher:
 class GogoGate2ApiCipher(ApiCipher):
     """Cipher for GogoGate2 devices."""
 
-    SHARED_SECRET: Final[str] = "0e3b7%i1X9@54cAf"
+    SHARED_SECRET: Final = "0e3b7%i1X9@54cAf"
 
     def __init__(self) -> None:
         """Initialize the object."""
@@ -105,21 +103,21 @@ class GogoGate2ApiCipher(ApiCipher):
 class ISmartGateApiCipher(ApiCipher):
     """Cipher for iSmartGate devices."""
 
-    RAW_TOKEN_FORMAT: Final[str] = "%s@ismartgate"
+    RAW_TOKEN_FORMAT: Final = "%s@ismartgate"
 
     def __init__(self, username: str, password: str) -> None:
         """Initialize the object."""
-        self._username: Final[str] = username
-        self._password: Final[str] = password
+        self._username: Final = username
+        self._password: Final = password
 
         # Calculate the token.
         raw_token: Final[
             str
         ] = ISmartGateApiCipher.RAW_TOKEN_FORMAT % self._username.lower()
-        self._token: Final[str] = sha1(raw_token.encode("utf-8")).hexdigest()  # nosec
+        self._token: Final = sha1(raw_token.encode("utf-8")).hexdigest()  # nosec
 
         # Calculate the key and pass it onto the superclass.
-        sha1_hex_str: Final[str] = sha1(  # nosec
+        sha1_hex_str: Final = sha1(  # nosec
             (self._username.lower() + self._password).encode()
         ).hexdigest()
 
@@ -151,7 +149,7 @@ class AbstractGateApi(
 ):
     """API capable of communicating with a gogogate2 devices."""
 
-    API_URL_TEMPLATE: Final[str] = "http://%s/api.php"
+    API_URL_TEMPLATE: Final = "http://%s/api.php"
     DEFAULT_REQUEST_TIMEOUT = timedelta(seconds=20)
     DEFAULT_TRANSITION_STATUS_TIMEOUT = timedelta(seconds=55)
 
@@ -165,13 +163,13 @@ class AbstractGateApi(
         transition_status_timeout: timedelta = DEFAULT_TRANSITION_STATUS_TIMEOUT,
     ) -> None:
         """Initialize the object."""
-        self._host: Final[str] = host
-        self._username: Final[str] = username
-        self._password: Final[str] = password
-        self._cipher: Final[ApiCipherType] = api_cipher
-        self._request_timeout: Final[timedelta] = request_timeout
-        self._transition_status_timeout: Final[timedelta] = transition_status_timeout
-        self._api_url: Final[str] = AbstractGateApi.API_URL_TEMPLATE % host
+        self._host: Final = host
+        self._username: Final = username
+        self._password: Final = password
+        self._cipher: Final = api_cipher
+        self._request_timeout: Final = request_timeout
+        self._transition_status_timeout: Final = transition_status_timeout
+        self._api_url: Final = AbstractGateApi.API_URL_TEMPLATE % host
         self._transition_door_status: Final[Dict[int, CachedTransitionDoorStatus]] = {}
 
     @property
@@ -200,7 +198,7 @@ class AbstractGateApi(
         arg1: Optional[str] = None,
         arg2: Optional[str] = None,
     ) -> Element:
-        command_str: Final[str] = json.dumps(
+        command_str: Final = json.dumps(
             (
                 self._username,
                 self._password,
@@ -219,7 +217,7 @@ class AbstractGateApi(
                 },
                 timeout=self._request_timeout.seconds,
             )
-        response_raw: Final[str] = response.content.decode("utf-8")
+        response_raw: Final = response.content.decode("utf-8")
 
         try:
             # Error messages are returned unencrypted so we try to decrypt the response.
@@ -228,16 +226,16 @@ class AbstractGateApi(
         except ValueError:
             response_text = response_raw
 
-        root_element: Final[Element] = ElementTree.fromstring(response_text)
+        root_element: Final = ElementTree.fromstring(response_text)
 
-        error_element: Final[Optional[Element]] = root_element.find("error")
+        error_element: Final = root_element.find("error")
         if error_element:
-            api_error: Final[ApiError] = element_to_api_error(error_element)
+            api_error: Final = element_to_api_error(error_element)
             raise self._get_exception_map().get(api_error.code, ApiError)(
                 api_error.code, api_error.message
             )
 
-        return root_element
+        return cast(Element, root_element)
 
     @abc.abstractmethod
     async def async_info(self) -> InfoResponseType:
@@ -297,7 +295,7 @@ class AbstractGateApi(
             return False
 
         # Get current door status.
-        info: Final[InfoResponseType] = await self.async_info()
+        info: Final = await self.async_info()
         statuses: Final = self._get_door_statuses(
             info, use_transitional_status=consider_transitional_states
         )
@@ -350,7 +348,7 @@ class AbstractGateApi(
     def _get_door_statuses(
         self, info: InfoResponseType, use_transitional_status: bool = True
     ) -> Dict[int, AllDoorStatus]:
-        doors: Final[Tuple[AbstractDoor, ...]] = get_configured_doors(info)
+        doors: Final = get_configured_doors(info)
 
         # Clean out the cache.
         for (cached_door_id, cached_transitional_status,) in list(
@@ -429,9 +427,9 @@ class ISmartGateApi(
     #  pylint: disable=no-self-use
     def _get_activate_api_code(self, info: ISmartGateInfoResponse, door_id: int) -> str:
         """Get api code for activate actions."""
-        door: Final[Optional[AbstractDoor]] = get_door_by_id(door_id, info)
+        door: Final = get_door_by_id(door_id, info)
         if not door:
-            raise Exception(f"Door with id {door_id} not found.")
+            raise InvalidDoorException(door_id)
 
         return cast(ISmartGateDoor, door).apicode
 
