@@ -1,7 +1,7 @@
 """Tets for main API."""
 from datetime import datetime
 from typing import Callable, Union
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from gogogate2_api import (
     AbstractGateApi,
@@ -18,8 +18,7 @@ from gogogate2_api.common import (
 )
 from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 import pytest
-import requests
-import responses
+import respx
 
 from .common import MockGogoGate2Server, MockISmartGateServer
 
@@ -103,8 +102,9 @@ def test_gogogate2_cipher() -> None:
         ),
     ),
 )
-@responses.activate
-def test_api_invalid_credentials(
+@pytest.mark.asyncio
+@respx.mock
+async def test_api_invalid_credentials(
     api_generator: ApiGenerator, server_generator: ServerGenerator, error_code: int
 ) -> None:
     """Test invalid credentials error."""
@@ -112,7 +112,7 @@ def test_api_invalid_credentials(
     api: ApiType = api_generator("device1", "fakeuser", "fakepassword")
     server_generator(api, username="fakeuser1", password="fakepassword2")
     with pytest.raises(ApiError) as exinfo:
-        api.info()
+        await api.async_info()
     assert exinfo.value.code == error_code
 
 
@@ -120,30 +120,16 @@ def test_api_invalid_credentials(
     ("api_generator", "server_generator"),
     ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
 )
-@responses.activate
-def test_api_connection_error(
-    api_generator: ApiGenerator, server_generator: ServerGenerator
-) -> None:
-    """Test http invalid host error."""
-    api: ApiType = api_generator("device1", "fakeuser", "fakepassword")
-    server_generator(api, host="realhost")
-    with pytest.raises(requests.exceptions.ConnectionError):
-        api.info()
-
-
-@pytest.mark.parametrize(
-    ("api_generator", "server_generator"),
-    ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
-)
-@responses.activate
-def test_activate(
+@pytest.mark.asyncio
+@respx.mock
+async def test_activate(
     api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test activate."""
     api = api_generator("device1", "fakeuser", "fakepassword")
     server_generator(api)
 
-    response = api.activate(1)
+    response = await api.async_activate(1)
     assert response
     assert response.result
 
@@ -152,9 +138,10 @@ def test_activate(
     ("api_generator", "server_generator"),
     ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
 )
-@responses.activate
+@pytest.mark.asyncio
+@respx.mock
 # pylint: disable=too-many-statements
-def test_open_and_close_door(
+async def test_open_and_close_door(
     api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
@@ -162,7 +149,7 @@ def test_open_and_close_door(
     server_generator(api)
 
     # Initial info.
-    response = api.info()
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -174,8 +161,8 @@ def test_open_and_close_door(
     assert door3.status == DoorStatus.UNDEFINED
 
     # Nothing changes because door is already closed.
-    assert api.close_door(1) is False
-    response = api.info()
+    assert await api.async_close_door(1) is False
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -187,8 +174,8 @@ def test_open_and_close_door(
     assert door3.status == DoorStatus.UNDEFINED
 
     # Open a door.
-    assert api.open_door(1) is True
-    response = api.info()
+    assert await api.async_open_door(1) is True
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -200,8 +187,8 @@ def test_open_and_close_door(
     assert door3.status == DoorStatus.UNDEFINED
 
     # Close a door.
-    assert api.close_door(2) is True
-    response = api.info()
+    assert await api.async_close_door(2) is True
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -213,8 +200,8 @@ def test_open_and_close_door(
     assert door3.status == DoorStatus.UNDEFINED
 
     # No change for already closed door.
-    assert api.close_door(2) is False
-    response = api.info()
+    assert await api.async_close_door(2) is False
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -226,8 +213,8 @@ def test_open_and_close_door(
     assert door3.status == DoorStatus.UNDEFINED
 
     # No change for unknown door.
-    assert api.close_door(8) is False
-    response = api.info()
+    assert await api.async_close_door(8) is False
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -240,8 +227,8 @@ def test_open_and_close_door(
 
     # No change for unsupported status.
     # pylint: disable=protected-access
-    assert api._set_door_status(1, DoorStatus.UNDEFINED) is False
-    response = api.info()
+    assert await api._async_set_door_status(1, DoorStatus.UNDEFINED) is False
+    response = await api.async_info()
     door1 = get_door_by_id(1, response)
     door2 = get_door_by_id(2, response)
     door3 = get_door_by_id(3, response)
@@ -260,9 +247,10 @@ def test_open_and_close_door(
         (ISmartGateApi, MockISmartGateServer, "yes"),
     ),
 )
-@responses.activate
+@pytest.mark.asyncio
+@respx.mock
 # pylint: disable=too-many-statements
-def test_remoteaccess(
+async def test_remoteaccess(
     api_generator: ApiGenerator, server_generator: ServerGenerator, true_value: str
 ) -> None:
     """Test open and close door."""
@@ -270,27 +258,28 @@ def test_remoteaccess(
     server = server_generator(api)
 
     server.set_info_value("remoteaccessenabled", "false")
-    assert not api.info().remoteaccessenabled
+    assert not (await api.async_info()).remoteaccessenabled
     server.set_info_value("remoteaccessenabled", "no")
-    assert not api.info().remoteaccessenabled
+    assert not (await api.async_info()).remoteaccessenabled
     server.set_info_value("remoteaccessenabled", "0")
-    assert not api.info().remoteaccessenabled
+    assert not (await api.async_info()).remoteaccessenabled
 
     server.set_info_value("remoteaccessenabled", true_value)
-    assert api.info().remoteaccessenabled
+    assert (await api.async_info()).remoteaccessenabled
     server.set_info_value("remoteaccessenabled", true_value.upper())
-    assert api.info().remoteaccessenabled
+    assert (await api.async_info()).remoteaccessenabled
     server.set_info_value("remoteaccessenabled", true_value.lower())
-    assert api.info().remoteaccessenabled
+    assert (await api.async_info()).remoteaccessenabled
 
 
 @pytest.mark.parametrize(
     ("api_generator", "server_generator"),
     ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
 )
-@responses.activate
+@pytest.mark.asyncio
+@respx.mock
 # pylint: disable=too-many-statements
-def test_sensor_temperature_and_voltage(
+async def test_sensor_temperature_and_voltage(
     api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
@@ -298,7 +287,7 @@ def test_sensor_temperature_and_voltage(
     server_generator(api)
 
     # Initial info.
-    response = api.info()
+    response = await api.async_info()
     assert response.door1.temperature == 16.3
     assert response.door1.voltage == 40
 
@@ -311,78 +300,92 @@ def test_sensor_temperature_and_voltage(
 
 @pytest.mark.parametrize(
     ("api_generator", "server_generator"),
-    ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
+    (
+        (GogoGate2Api, MockGogoGate2Server),
+        # (ISmartGateApi, MockISmartGateServer)
+    ),
 )
-@patch("gogogate2_api.datetime")
-@responses.activate
+@pytest.mark.asyncio
+@respx.mock
 # pylint: disable=too-many-statements
-def test_transitional_door_statuses(
-    datetime_mock: Mock, api_generator: ApiGenerator, server_generator: ServerGenerator
+async def test_transitional_door_statuses(
+    api_generator: ApiGenerator, server_generator: ServerGenerator
 ) -> None:
     """Test open and close door."""
-    api = api_generator("device1", "fakeuser", "fakepassword")
-    mock_server = server_generator(api)
+    with patch("gogogate2_api.datetime") as datetime_mock:
+        api = api_generator("device1", "fakeuser", "fakepassword")
+        mock_server = server_generator(api)
 
-    # Test current status.
-    datetime_mock.utcnow.side_effect = datetime.utcnow
-    api._transition_door_status.clear()  # pylint: disable=protected-access
-    assert api.get_door_statuses() == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
-    assert api.get_door_statuses(use_transitional_status=True) == {
-        1: DoorStatus.CLOSED,
-        2: DoorStatus.OPENED,
-    }
-    assert api.get_door_statuses(use_transitional_status=False) == {
-        1: DoorStatus.CLOSED,
-        2: DoorStatus.OPENED,
-    }
+        # Test current status.
+        datetime_mock.utcnow.side_effect = datetime.utcnow
+        api._transition_door_status.clear()  # pylint: disable=protected-access
+        assert await api.async_get_door_statuses() == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=True) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=False) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
 
-    # Test door is in the process of opening.
-    datetime_mock.utcnow.side_effect = datetime.utcnow
-    api._transition_door_status.clear()  # pylint: disable=protected-access
-    api.open_door(1)
-    mock_server.set_device_status(1, DoorStatus.CLOSED)
-    assert api.get_door_statuses() == {
-        1: TransitionDoorStatus.OPENING,
-        2: DoorStatus.OPENED,
-    }
-    assert api.get_door_statuses(use_transitional_status=True) == {
-        1: TransitionDoorStatus.OPENING,
-        2: DoorStatus.OPENED,
-    }
-    assert api.get_door_statuses(use_transitional_status=False) == {
-        1: DoorStatus.CLOSED,
-        2: DoorStatus.OPENED,
-    }
+        # Test door is in the process of opening.
+        datetime_mock.utcnow.side_effect = datetime.utcnow
+        api._transition_door_status.clear()  # pylint: disable=protected-access
+        await api.async_open_door(1)
+        mock_server.set_device_status(1, DoorStatus.CLOSED)
+        assert await api.async_get_door_statuses() == {
+            1: TransitionDoorStatus.OPENING,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=True) == {
+            1: TransitionDoorStatus.OPENING,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=False) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
 
-    # Door is open before the transitional cache timeout.
-    datetime_mock.utcnow.side_effect = datetime.utcnow
-    api._transition_door_status.clear()  # pylint: disable=protected-access
-    api.open_door(1)
-    assert api.get_door_statuses() == {1: DoorStatus.OPENED, 2: DoorStatus.OPENED}
-    assert api.get_door_statuses(use_transitional_status=True) == {
-        1: DoorStatus.OPENED,
-        2: DoorStatus.OPENED,
-    }
-    assert api.get_door_statuses(use_transitional_status=False) == {
-        1: DoorStatus.OPENED,
-        2: DoorStatus.OPENED,
-    }
+        # Door is open before the transitional cache timeout.
+        datetime_mock.utcnow.side_effect = datetime.utcnow
+        api._transition_door_status.clear()  # pylint: disable=protected-access
+        await api.async_open_door(1)
+        assert await api.async_get_door_statuses() == {
+            1: DoorStatus.OPENED,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=True) == {
+            1: DoorStatus.OPENED,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=False) == {
+            1: DoorStatus.OPENED,
+            2: DoorStatus.OPENED,
+        }
 
-    # Door remains closed after the transitional cache timeout.
-    datetime_mock.utcnow.side_effect = datetime.utcnow
-    api._transition_door_status.clear()  # pylint: disable=protected-access
-    mock_server.set_device_status(1, DoorStatus.CLOSED)
-    api.open_door(1)
-    mock_server.set_device_status(1, DoorStatus.CLOSED)
-    datetime_mock.utcnow.side_effect = (
-        lambda: datetime.utcnow() + AbstractGateApi.DEFAULT_TRANSITION_STATUS_TIMEOUT
-    )
-    assert api.get_door_statuses() == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
-    assert api.get_door_statuses(use_transitional_status=True) == {
-        1: DoorStatus.CLOSED,
-        2: DoorStatus.OPENED,
-    }
-    assert api.get_door_statuses(use_transitional_status=False) == {
-        1: DoorStatus.CLOSED,
-        2: DoorStatus.OPENED,
-    }
+        # Door remains closed after the transitional cache timeout.
+        datetime_mock.utcnow.side_effect = datetime.utcnow
+        api._transition_door_status.clear()  # pylint: disable=protected-access
+        mock_server.set_device_status(1, DoorStatus.CLOSED)
+        await api.async_open_door(1)
+        mock_server.set_device_status(1, DoorStatus.CLOSED)
+        datetime_mock.utcnow.side_effect = (
+            lambda: datetime.utcnow()
+            + AbstractGateApi.DEFAULT_TRANSITION_STATUS_TIMEOUT
+        )
+        assert await api.async_get_door_statuses() == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=True) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
+        assert await api.async_get_door_statuses(use_transitional_status=False) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }

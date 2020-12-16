@@ -52,22 +52,22 @@ from gogogate2_api import GogoGate2Api, ISmartGateApi
 gogogate2_api = GogoGate2Api("10.10.0.23", "admin", "password")
 
 # Get info about device and all doors.
-gogogate2_api.info()
+await gogogate2_api.async_info()
 
 # Open/close door.
-gogogate2_api.open_door(1)
-gogogate2_api.close_door(1)
+await gogogate2_api.async_open_door(1)
+await gogogate2_api.async_close_door(1)
 
 
 # iSmartGate API
 ismartgate_api = ISmartGateApi("10.10.0.24", "admin", "password")
 
 # Get info about device and all doors.
-ismartgate_api.info()
+await ismartgate_api.async_info()
 
 # Open/close door.
-ismartgate_api.open_door(1)
-ismartgate_api.close_door(1)
+await ismartgate_api.async_open_door(1)
+await ismartgate_api.async_close_door(1)
 ```
 
 ## Building
