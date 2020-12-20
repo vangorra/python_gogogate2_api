@@ -16,6 +16,7 @@ from gogogate2_api.common import (
     get_configured_doors,
     int_or_raise,
     str_or_raise,
+    get_configured_door_by_id,
 )
 import pytest
 from typing_extensions import Final
@@ -64,7 +65,7 @@ def test_enum_or_raise() -> None:
         assert exinfo.value.expected == DoorStatus
 
 
-def test_get_enabled_doors() -> None:
+def test_get_configured_doors() -> None:
     """Test get configurd doors."""
     response: Final = GogoGate2InfoResponse(
         user="user1",
@@ -122,4 +123,7 @@ def test_get_enabled_doors() -> None:
         wifi=Wifi(SSID="", linkquality="", signal=""),
     )
 
+    assert get_configured_door_by_id(1, response) == response.door1
+    assert not get_configured_door_by_id(2, response)
+    assert get_configured_door_by_id(3, response) == response.door3
     assert get_configured_doors(response) == (response.door1, response.door3)
