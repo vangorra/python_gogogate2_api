@@ -99,7 +99,7 @@ combine_as_imports = true
 branch = true
 
 [tool.coverage.report]
-fail_under = 97.0
+fail_under = 98.0
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
