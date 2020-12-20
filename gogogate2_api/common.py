@@ -27,12 +27,7 @@ class TagException(Exception):
 
     def __init__(self, tag: str, message: str) -> None:
         super().__init__(message)
-        self._tag: Final = tag
-
-    @property
-    def tag(self) -> str:
-        """Get the tag."""
-        return self._tag
+        self.tag: Final = tag
 
 
 class TagNotFoundException(TagException):
@@ -59,18 +54,8 @@ class UnexpectedTypeException(Exception):
         super().__init__(
             'Expected of "%s" to be "%s" but was "%s."' % (value, expected, type(value))
         )
-        self._value: Final = value
-        self._expected: Final = expected
-
-    @property
-    def value(self) -> Any:
-        """Get value."""
-        return self._value
-
-    @property
-    def expected(self) -> Type[GenericType]:
-        """Get expected type."""
-        return self._expected
+        self.value: Final = value
+        self.expected: Final = expected
 
 
 def enforce_type(value: Any, expected: Type[GenericType]) -> GenericType:
