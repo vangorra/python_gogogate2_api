@@ -3,8 +3,6 @@ from datetime import datetime
 from typing import Callable, Union
 from unittest.mock import patch
 
-from typing_extensions import Final
-
 from gogogate2_api import (
     AbstractGateApi,
     GogoGate2Api,
@@ -15,13 +13,15 @@ from gogogate2_api import (
 from gogogate2_api.common import (
     ApiError,
     DoorStatus,
+    InvalidDoorException,
     TransitionDoorStatus,
     get_door_by_id,
-    InvalidDoorException,
 )
 from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
+import httpx
 import pytest
 import respx
+from typing_extensions import Final
 
 from .common import MockGogoGate2Server, MockISmartGateServer
 
@@ -406,3 +406,23 @@ async def test_ismartgate_activate_invalid_door(
 
     with pytest.raises(InvalidDoorException):
         await api.async_activate(5)
+
+
+@pytest.mark.parametrize(
+    ("api_generator", "server_generator"),
+    ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer),),
+)
+@pytest.mark.asyncio
+@respx.mock
+# pylint: disable=too-many-statements
+async def test_httpx_client(
+    api_generator: ApiGenerator, server_generator: ServerGenerator
+) -> None:
+    """Verify we can accept a shared httpx AsyncClient."""
+    httpx_async_client: httpx.AsyncClient = httpx.AsyncClient()
+    api: Final = api_generator(  # type: ignore
+        "device1", "fakeuser", "fakepassword", httpx_async_client=httpx_async_client
+    )
+    server_generator(api)
+
+    assert await api.async_info()

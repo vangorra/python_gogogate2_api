@@ -1,5 +1,6 @@
 """Constants for gate devices"""
 from enum import IntEnum
+
 from typing_extensions import Final
 
 

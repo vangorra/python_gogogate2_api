@@ -29,6 +29,7 @@ from .common import (
     GogoGate2ActivateResponse,
     GogoGate2InfoResponse,
     InvalidApiCodeException,
+    InvalidDoorException,
     InvalidOptionException,
     ISmartGateActivateResponse,
     ISmartGateDoor,
@@ -42,7 +43,6 @@ from .common import (
     element_to_ismartgate_info_response,
     get_configured_doors,
     get_door_by_id,
-    InvalidDoorException,
 )
 from .const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 
@@ -161,6 +161,7 @@ class AbstractGateApi(
         api_cipher: ApiCipherType,
         request_timeout: timedelta = DEFAULT_REQUEST_TIMEOUT,
         transition_status_timeout: timedelta = DEFAULT_TRANSITION_STATUS_TIMEOUT,
+        httpx_async_client: Optional[AsyncClient] = None,
     ) -> None:
         """Initialize the object."""
         self._host: Final = host
@@ -171,6 +172,7 @@ class AbstractGateApi(
         self._transition_status_timeout: Final = transition_status_timeout
         self._api_url: Final = AbstractGateApi.API_URL_TEMPLATE % host
         self._transition_door_status: Final[Dict[int, CachedTransitionDoorStatus]] = {}
+        self._httpx_async_client: Final = httpx_async_client
 
     @property
     def host(self) -> str:
@@ -208,16 +210,19 @@ class AbstractGateApi(
             )
         )
 
-        async with AsyncClient() as client:
-            response: Final = await client.get(
-                self._api_url,
-                params={
-                    "data": self._cipher.encrypt(command_str),
-                    **self._get_extra_url_params(),
-                },
-                timeout=self._request_timeout.seconds,
-            )
+        client = self._httpx_async_client or AsyncClient()
+        response: Final = await client.get(
+            self._api_url,
+            params={
+                "data": self._cipher.encrypt(command_str),
+                **self._get_extra_url_params(),
+            },
+            timeout=self._request_timeout.seconds,
+        )
         response_raw: Final = response.content.decode("utf-8")
+
+        if not self._httpx_async_client:
+            await client.aclose()
 
         try:
             # Error messages are returned unencrypted so we try to decrypt the response.
@@ -398,6 +403,7 @@ class ISmartGateApi(
         password: str,
         request_timeout: timedelta = AbstractGateApi.DEFAULT_REQUEST_TIMEOUT,
         transition_status_timeout: timedelta = AbstractGateApi.DEFAULT_TRANSITION_STATUS_TIMEOUT,
+        httpx_async_client: Optional[AsyncClient] = None,
     ) -> None:
         """Initialize the object."""
         super().__init__(
@@ -407,6 +413,7 @@ class ISmartGateApi(
             ISmartGateApiCipher(username, password),
             request_timeout=request_timeout,
             transition_status_timeout=transition_status_timeout,
+            httpx_async_client=httpx_async_client,
         )
 
     async def async_info(self) -> ISmartGateInfoResponse:
@@ -466,6 +473,7 @@ class GogoGate2Api(
         password: str,
         request_timeout: timedelta = AbstractGateApi.DEFAULT_REQUEST_TIMEOUT,
         transition_status_timeout: timedelta = AbstractGateApi.DEFAULT_TRANSITION_STATUS_TIMEOUT,
+        httpx_async_client: Optional[AsyncClient] = None,
     ) -> None:
         """Initialize the object."""
         super().__init__(
@@ -475,6 +483,7 @@ class GogoGate2Api(
             GogoGate2ApiCipher(),
             request_timeout=request_timeout,
             transition_status_timeout=transition_status_timeout,
+            httpx_async_client=httpx_async_client,
         )
 
     async def async_info(self) -> GogoGate2InfoResponse:
