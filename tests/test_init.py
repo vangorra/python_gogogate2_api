@@ -319,6 +319,7 @@ async def test_transitional_door_statuses(
         # Test current status.
         datetime_mock.utcnow.side_effect = datetime.utcnow
         api._transition_door_status.clear()  # pylint: disable=protected-access
+        info = await api.async_info()
         assert await api.async_get_door_statuses() == {
             1: DoorStatus.CLOSED,
             2: DoorStatus.OPENED,
@@ -331,12 +332,23 @@ async def test_transitional_door_statuses(
             1: DoorStatus.CLOSED,
             2: DoorStatus.OPENED,
         }
+        assert api.async_get_door_statuses_from_info(info) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=True
+        ) == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=False
+        ) == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
 
         # Test door is in the process of opening.
         datetime_mock.utcnow.side_effect = datetime.utcnow
         api._transition_door_status.clear()  # pylint: disable=protected-access
         await api.async_open_door(1)
         mock_server.set_device_status(1, DoorStatus.CLOSED)
+        info = await api.async_info()
         assert await api.async_get_door_statuses() == {
             1: TransitionDoorStatus.OPENING,
             2: DoorStatus.OPENED,
@@ -349,11 +361,22 @@ async def test_transitional_door_statuses(
             1: DoorStatus.CLOSED,
             2: DoorStatus.OPENED,
         }
+        assert api.async_get_door_statuses_from_info(info) == {
+            1: TransitionDoorStatus.OPENING,
+            2: DoorStatus.OPENED,
+        }
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=True
+        ) == {1: TransitionDoorStatus.OPENING, 2: DoorStatus.OPENED}
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=False
+        ) == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
 
         # Door is open before the transitional cache timeout.
         datetime_mock.utcnow.side_effect = datetime.utcnow
         api._transition_door_status.clear()  # pylint: disable=protected-access
         await api.async_open_door(1)
+        info = await api.async_info()
         assert await api.async_get_door_statuses() == {
             1: DoorStatus.OPENED,
             2: DoorStatus.OPENED,
@@ -366,6 +389,16 @@ async def test_transitional_door_statuses(
             1: DoorStatus.OPENED,
             2: DoorStatus.OPENED,
         }
+        assert api.async_get_door_statuses_from_info(info) == {
+            1: DoorStatus.OPENED,
+            2: DoorStatus.OPENED,
+        }
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=True
+        ) == {1: DoorStatus.OPENED, 2: DoorStatus.OPENED}
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=False
+        ) == {1: DoorStatus.OPENED, 2: DoorStatus.OPENED}
 
         # Door remains closed after the transitional cache timeout.
         datetime_mock.utcnow.side_effect = datetime.utcnow
@@ -377,6 +410,7 @@ async def test_transitional_door_statuses(
             lambda: datetime.utcnow()
             + AbstractGateApi.DEFAULT_TRANSITION_STATUS_TIMEOUT
         )
+        info = await api.async_info()
         assert await api.async_get_door_statuses() == {
             1: DoorStatus.CLOSED,
             2: DoorStatus.OPENED,
@@ -389,6 +423,16 @@ async def test_transitional_door_statuses(
             1: DoorStatus.CLOSED,
             2: DoorStatus.OPENED,
         }
+        assert api.async_get_door_statuses_from_info(info) == {
+            1: DoorStatus.CLOSED,
+            2: DoorStatus.OPENED,
+        }
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=True
+        ) == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
+        assert api.async_get_door_statuses_from_info(
+            info, use_transitional_status=False
+        ) == {1: DoorStatus.CLOSED, 2: DoorStatus.OPENED}
 
 
 @pytest.mark.parametrize(

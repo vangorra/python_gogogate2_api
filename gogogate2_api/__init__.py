@@ -383,6 +383,14 @@ class AbstractGateApi(
             await self.async_info(), use_transitional_status=use_transitional_status
         )
 
+    def async_get_door_statuses_from_info(
+        self, info: InfoResponseType, use_transitional_status: bool = True
+    ) -> Dict[int, AllDoorStatus]:
+        """Get configured door statuses from an existing info response."""
+        return self._get_door_statuses(
+            info, use_transitional_status=use_transitional_status
+        )
+
 
 class ISmartGateApi(
     AbstractGateApi[
