@@ -353,10 +353,12 @@ def element_or_raise(element: Optional[Element], tag: str) -> Element:
 
 
 def element_text_or_empty(element: Optional[Element], tag: str) -> str:
+    """Get element value as text or an empty string."""
     return element_text_or_default(element, tag, "")
 
 
 def element_text_or_default(element: Optional[Element], tag: str, default: str) -> str:
+    """Get element value as text or a default value."""
     val: Final = element_text_or_none(element, tag)
     if val is None:
         return default
