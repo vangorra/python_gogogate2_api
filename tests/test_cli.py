@@ -7,6 +7,7 @@ from typing import Callable
 
 from asynctest import MagicMock, Mock, patch
 from click.testing import CliRunner
+import pytest
 from typing_extensions import Final
 
 from gogogate2_api import GogoGate2Api, ISmartGateApi
@@ -19,7 +20,6 @@ from gogogate2_api.cli import (
     gogogate2_cli,
     ismartgate_cli,
 )
-import pytest
 
 
 class StubbedTypeEnum(Enum):

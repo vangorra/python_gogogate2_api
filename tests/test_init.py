@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Callable, Union
 from unittest.mock import patch
 
+import pytest
+import respx
 from typing_extensions import Final
 
 from gogogate2_api import (
@@ -15,13 +17,11 @@ from gogogate2_api import (
 from gogogate2_api.common import (
     ApiError,
     DoorStatus,
+    InvalidDoorException,
     TransitionDoorStatus,
     get_door_by_id,
-    InvalidDoorException,
 )
 from gogogate2_api.const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
-import pytest
-import respx
 
 from .common import MockGogoGate2Server, MockISmartGateServer
 
@@ -392,7 +392,8 @@ async def test_transitional_door_statuses(
 
 
 @pytest.mark.parametrize(
-    ("api_generator", "server_generator"), ((ISmartGateApi, MockISmartGateServer),),
+    ("api_generator", "server_generator"),
+    ((ISmartGateApi, MockISmartGateServer),),
 )
 @pytest.mark.asyncio
 @respx.mock

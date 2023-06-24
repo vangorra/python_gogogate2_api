@@ -1,5 +1,8 @@
 """Tests for common code."""
 from defusedxml import ElementTree
+import pytest
+from typing_extensions import Final
+
 from gogogate2_api.common import (
     DoorMode,
     DoorStatus,
@@ -13,13 +16,11 @@ from gogogate2_api.common import (
     Wifi,
     element_text_or_raise,
     enum_or_raise,
+    get_configured_door_by_id,
     get_configured_doors,
     int_or_raise,
     str_or_raise,
-    get_configured_door_by_id,
 )
-import pytest
-from typing_extensions import Final
 
 
 def test_element_exceptions() -> None:

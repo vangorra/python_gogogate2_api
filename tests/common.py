@@ -5,7 +5,11 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from urllib.parse import parse_qs
 from xml.dom.minidom import parseString
 
-import dicttoxml
+import dicttoxml2
+from httpx import Request, Response
+import respx
+from typing_extensions import Final
+
 from gogogate2_api import AbstractGateApi, ISmartGateApiCipher
 from gogogate2_api.common import (
     DoorMode,
@@ -21,9 +25,6 @@ from gogogate2_api.common import (
     Wifi,
 )
 from gogogate2_api.const import NONE_INT, GogoGate2ApiErrorCode, ISmartGateApiErrorCode
-from httpx import Request, Response
-import respx
-from typing_extensions import Final
 
 MockInfoResponse = TypeVar(
     "MockInfoResponse", bound=Union[GogoGate2InfoResponse, ISmartGateInfoResponse]
@@ -129,7 +130,6 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
 
         # Maybe validate token.
         if isinstance(self.cipher, ISmartGateApiCipher):
-
             if b"token" not in query:
                 return self._get_error_token_not_set_response()
 
@@ -193,7 +193,7 @@ class AbstractMockServer(Generic[MockInfoResponse], abc.ABC):
 
     def _new_response(self, data: Any, encrypt: bool = True) -> Response:
         xml_str = parseString(
-            dicttoxml.dicttoxml(data, custom_root="response", attr_type=False)
+            dicttoxml2.dicttoxml(data, custom_root="response", attr_type=False)
         ).toprettyxml()
 
         return Response(
@@ -257,7 +257,11 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
                 temperature=16.3,
                 voltage=NONE_INT,
             ),
-            outputs=Outputs(output1=True, output2=False, output3=False,),
+            outputs=Outputs(
+                output1=True,
+                output2=False,
+                output3=False,
+            ),
             network=Network(ip="127.0.0.1"),
             wifi=Wifi(SSID="Wifi network", linkquality="80%", signal="20"),
         )
@@ -269,12 +273,14 @@ class MockGogoGate2Server(AbstractMockServer[GogoGate2InfoResponse]):
 
     def _get_error_invalid_token_response(self) -> Response:
         return self._error_response(
-            GogoGate2ApiErrorCode.INVALID_TOKEN.value, "Error: invalid token",
+            GogoGate2ApiErrorCode.INVALID_TOKEN.value,
+            "Error: invalid token",
         )
 
     def _get_error_token_not_set_response(self) -> Response:
         return self._error_response(
-            GogoGate2ApiErrorCode.TOKEN_NOT_SET.value, "Error: token not set",
+            GogoGate2ApiErrorCode.TOKEN_NOT_SET.value,
+            "Error: token not set",
         )
 
     def _get_error_absent_credentials_response(self) -> Response:
@@ -387,12 +393,14 @@ class MockISmartGateServer(AbstractMockServer[ISmartGateInfoResponse]):
 
     def _get_error_invalid_token_response(self) -> Response:
         return self._error_response(
-            ISmartGateApiErrorCode.INVALID_TOKEN.value, "Error: invalid token",
+            ISmartGateApiErrorCode.INVALID_TOKEN.value,
+            "Error: invalid token",
         )
 
     def _get_error_token_not_set_response(self) -> Response:
         return self._error_response(
-            ISmartGateApiErrorCode.TOKEN_NOT_SET.value, "Error: token not set",
+            ISmartGateApiErrorCode.TOKEN_NOT_SET.value,
+            "Error: token not set",
         )
 
     def _get_error_absent_credentials_response(self) -> Response:

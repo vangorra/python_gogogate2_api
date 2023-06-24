@@ -94,7 +94,11 @@ def get_context_api(ctx: click.core.Context) -> AbstractGateApi:
 @click.version_option()
 @click.pass_context
 def cli(
-    ctx: click.core.Context, host: str, username: str, password: str, device_type: str,
+    ctx: click.core.Context,
+    host: str,
+    username: str,
+    password: str,
+    device_type: str,
 ) -> None:
     """Interact with the device API."""
     api_generator: Callable[[str, str, str], Union[GogoGate2Api, ISmartGateApi]]
