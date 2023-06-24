@@ -29,6 +29,7 @@ from .common import (
     GogoGate2ActivateResponse,
     GogoGate2InfoResponse,
     InvalidApiCodeException,
+    InvalidDoorException,
     InvalidOptionException,
     ISmartGateActivateResponse,
     ISmartGateDoor,
@@ -42,7 +43,6 @@ from .common import (
     element_to_ismartgate_info_response,
     get_configured_doors,
     get_door_by_id,
-    InvalidDoorException,
 )
 from .const import GogoGate2ApiErrorCode, ISmartGateApiErrorCode
 
@@ -111,9 +111,9 @@ class ISmartGateApiCipher(ApiCipher):
         self._password: Final = password
 
         # Calculate the token.
-        raw_token: Final[
-            str
-        ] = ISmartGateApiCipher.RAW_TOKEN_FORMAT % self._username.lower()
+        raw_token: Final[str] = (
+            ISmartGateApiCipher.RAW_TOKEN_FORMAT % self._username.lower()
+        )
         self._token: Final = sha1(raw_token.encode("utf-8")).hexdigest()  # nosec
 
         # Calculate the key and pass it onto the superclass.
@@ -131,21 +131,21 @@ class ISmartGateApiCipher(ApiCipher):
         return self._token
 
 
-ApiCipherType = TypeVar(
-    "ApiCipherType", bound=Union[GogoGate2ApiCipher, ISmartGateApiCipher]
+ApiCipherTypeVar = TypeVar(
+    "ApiCipherTypeVar", bound=Union[GogoGate2ApiCipher, ISmartGateApiCipher]
 )
-InfoResponseType = TypeVar(
-    "InfoResponseType", bound=Union[GogoGate2InfoResponse, ISmartGateInfoResponse]
+InfoResponseTypeVar = TypeVar(
+    "InfoResponseTypeVar", bound=Union[GogoGate2InfoResponse, ISmartGateInfoResponse]
 )
-ActivateResponseType = TypeVar(
-    "ActivateResponseType",
+ActivateResponseTypeVar = TypeVar(
+    "ActivateResponseTypeVar",
     bound=Union[GogoGate2ActivateResponse, ISmartGateActivateResponse],
 )
 
 
 # pylint: disable=too-many-instance-attributes
 class AbstractGateApi(
-    Generic[ApiCipherType, InfoResponseType, ActivateResponseType], abc.ABC
+    Generic[ApiCipherTypeVar, InfoResponseTypeVar, ActivateResponseTypeVar], abc.ABC
 ):
     """API capable of communicating with a gogogate2 devices."""
 
@@ -158,7 +158,7 @@ class AbstractGateApi(
         host: str,
         username: str,
         password: str,
-        api_cipher: ApiCipherType,
+        api_cipher: ApiCipherTypeVar,
         request_timeout: timedelta = DEFAULT_REQUEST_TIMEOUT,
         transition_status_timeout: timedelta = DEFAULT_TRANSITION_STATUS_TIMEOUT,
     ) -> None:
@@ -188,7 +188,7 @@ class AbstractGateApi(
         return self._password
 
     @property
-    def cipher(self) -> ApiCipherType:
+    def cipher(self) -> ApiCipherTypeVar:
         """Get the cipher."""
         return self._cipher
 
@@ -238,11 +238,11 @@ class AbstractGateApi(
         return cast(Element, root_element)
 
     @abc.abstractmethod
-    async def async_info(self) -> InfoResponseType:
+    async def async_info(self) -> InfoResponseTypeVar:
         """Get info about the device and doors."""
 
     @abc.abstractmethod
-    async def async_activate(self, door_id: int) -> ActivateResponseType:
+    async def async_activate(self, door_id: int) -> ActivateResponseTypeVar:
         """Send a command to open/close/stop the door.
 
         Devices do not have a status for opening or closing. So running
@@ -251,7 +251,7 @@ class AbstractGateApi(
         before running and run if needed."""
 
     @abc.abstractmethod
-    def _get_activate_api_code(self, info: InfoResponseType, door_id: int) -> str:
+    def _get_activate_api_code(self, info: InfoResponseTypeVar, door_id: int) -> str:
         """Get api code for activate actions."""
 
     @staticmethod
@@ -259,7 +259,6 @@ class AbstractGateApi(
     def _get_exception_map() -> Dict[int, ExceptionGenerator]:
         """Return a more specific exception."""
 
-    # pylint: disable=no-self-use
     def _get_extra_url_params(self) -> Dict[str, str]:
         return {}
 
@@ -268,7 +267,7 @@ class AbstractGateApi(
         return await self._async_request(RequestOption.INFO)
 
     async def _async_activate(
-        self, door_id: int, info: Optional[InfoResponseType] = None
+        self, door_id: int, info: Optional[InfoResponseTypeVar] = None
     ) -> Element:
         """Send a command to open/close/stop the door.
 
@@ -300,8 +299,16 @@ class AbstractGateApi(
             info, use_transitional_status=consider_transitional_states
         )
         current_door_status: Final = statuses.get(door_id)
-        result_door_statuses: Final = OPEN_DOOR_STATUSES if target_door_status == DoorStatus.OPENED else CLOSE_DOOR_STATUSES
-        transitional_door_status: Final = TransitionDoorStatus.OPENING if target_door_status == DoorStatus.OPENED else TransitionDoorStatus.CLOSING
+        result_door_statuses: Final = (
+            OPEN_DOOR_STATUSES
+            if target_door_status == DoorStatus.OPENED
+            else CLOSE_DOOR_STATUSES
+        )
+        transitional_door_status: Final = (
+            TransitionDoorStatus.OPENING
+            if target_door_status == DoorStatus.OPENED
+            else TransitionDoorStatus.CLOSING
+        )
 
         # Door is invalid, not configured, already in desired state or transitioning to it.
         if not current_door_status or current_door_status in result_door_statuses:
@@ -346,14 +353,15 @@ class AbstractGateApi(
         )
 
     def _get_door_statuses(
-        self, info: InfoResponseType, use_transitional_status: bool = True
+        self, info: InfoResponseTypeVar, use_transitional_status: bool = True
     ) -> Dict[int, AllDoorStatus]:
         doors: Final = get_configured_doors(info)
 
         # Clean out the cache.
-        for (cached_door_id, cached_transitional_status,) in list(
-            self._transition_door_status.items()
-        ):
+        for (
+            cached_door_id,
+            cached_transitional_status,
+        ) in list(self._transition_door_status.items()):
             if (
                 datetime.utcnow() - cached_transitional_status.activated
                 >= self._transition_status_timeout
@@ -424,7 +432,6 @@ class ISmartGateApi(
             await self._async_activate(door_id)
         )
 
-    #  pylint: disable=no-self-use
     def _get_activate_api_code(self, info: ISmartGateInfoResponse, door_id: int) -> str:
         """Get api code for activate actions."""
         door: Final = get_door_by_id(door_id, info)
@@ -503,7 +510,6 @@ class GogoGate2Api(
             GogoGate2ApiErrorCode.DOOR_NOT_SET.value: DoorNotSetException,
         }
 
-    # pylint: disable=unused-argument, no-self-use
     def _get_activate_api_code(self, info: GogoGate2InfoResponse, door_id: int) -> str:
         """Get api code for activate actions."""
         return info.apicode

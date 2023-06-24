@@ -11,7 +11,7 @@ from typing_extensions import Final
 
 from .const import NONE_INT
 
-GenericType = TypeVar("GenericType")
+GenericTypeVar = TypeVar("GenericTypeVar")
 
 
 class InvalidDoorException(Exception):
@@ -49,16 +49,16 @@ class TextEmptyException(TagException):
 class UnexpectedTypeException(Exception):
     """Thrown when encountering an unexpected type."""
 
-    def __init__(self, value: Any, expected: Type[GenericType]):
+    def __init__(self, value: Any, expected: Type[GenericTypeVar]):
         """Initialize."""
         super().__init__(
-            'Expected of "%s" to be "%s" but was "%s."' % (value, expected, type(value))
+            f'Expected of "{value}" to be "{expected}" but was "{type(value)}."'
         )
         self.value: Final = value
         self.expected: Final = expected
 
 
-def enforce_type(value: Any, expected: Type[GenericType]) -> GenericType:
+def enforce_type(value: Any, expected: Type[GenericTypeVar]) -> GenericTypeVar:
     """Enforce a data type."""
     if not isinstance(value, expected):
         raise UnexpectedTypeException(value, expected)
@@ -67,8 +67,8 @@ def enforce_type(value: Any, expected: Type[GenericType]) -> GenericType:
 
 
 def value_or_none(
-    value: Any, convert_fn: Callable[[Any], GenericType]
-) -> Union[GenericType, None]:
+    value: Any, convert_fn: Callable[[Any], GenericTypeVar]
+) -> Union[GenericTypeVar, None]:
     """Convert a value given a specific conversion function."""
     if value is None:
         return None
@@ -164,7 +164,7 @@ class DoorNotSetException(ApiError):
     """Door not set exception."""
 
 
-ExceptionGenerator: Final = Callable[[int, str], ApiError]
+ExceptionGenerator = Callable[[int, str], ApiError]
 
 
 class DoorStatus(Enum):
@@ -182,7 +182,7 @@ class TransitionDoorStatus(Enum):
     CLOSING = "closing"
 
 
-AllDoorStatus: Final = Union[DoorStatus, TransitionDoorStatus]
+AllDoorStatus = Union[DoorStatus, TransitionDoorStatus]
 
 
 CLOSE_DOOR_STATUSES: Final = frozenset(
@@ -401,7 +401,9 @@ def wifi_or_raise(element: Element) -> Wifi:
 
 def network_or_raise(element: Element) -> Network:
     """Get network from xml element."""
-    return Network(ip=element_text_or_raise(element, "ip"),)
+    return Network(
+        ip=element_text_or_raise(element, "ip"),
+    )
 
 
 def outputs_or_raise(element: Element) -> Outputs:
@@ -557,4 +559,4 @@ def get_configured_door_by_id(
 
 def get_configured_doors(response: AbstractInfoResponse) -> Tuple[AbstractDoor, ...]:
     """Get a tuple of configured doors from a response."""
-    return tuple([door for door in get_doors(response) if door.name])
+    return tuple(door for door in get_doors(response) if door.name)
