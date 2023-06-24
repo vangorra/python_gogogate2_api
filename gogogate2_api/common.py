@@ -352,6 +352,20 @@ def element_or_raise(element: Optional[Element], tag: str) -> Element:
     return found_element
 
 
+def element_text_or_empty(element: Optional[Element], tag: str) -> str:
+    """Get element value as text or an empty string."""
+    return element_text_or_default(element, tag, "")
+
+
+def element_text_or_default(element: Optional[Element], tag: str, default: str) -> str:
+    """Get element value as text or a default value."""
+    val: Final = element_text_or_none(element, tag)
+    if val is None:
+        return default
+
+    return cast(str, val)
+
+
 def element_text_or_none(element: Optional[Element], tag: str) -> Optional[str]:
     """Get element text from xml element."""
     found_element: Final = element_or_none(element, tag)
@@ -446,9 +460,9 @@ def ismartgate_door_or_raise(door_id: int, element: Element) -> ISmartGateDoor:
     voltage: Final = int_or_none(element_text_or_none(element, "voltage"))
     return ISmartGateDoor(
         door_id=door_id,
-        enabled=element_text_or_raise(element, "enabled").lower() == "yes",
-        apicode=element_text_or_raise(element, "apicode"),
-        customimage=element_text_or_raise(element, "customimage").lower() == "yes",
+        enabled=element_text_or_empty(element, "enabled").lower() == "yes",
+        apicode=element_text_or_empty(element, "apicode"),
+        customimage=element_text_or_empty(element, "customimage").lower() == "yes",
         permission=element_text_or_raise(element, "permission").lower() == "yes",
         name=element_text_or_none(element, "name"),
         gate=element_text_or_raise(element, "gate").lower() == "yes",

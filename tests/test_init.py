@@ -301,6 +301,21 @@ async def test_sensor_temperature_and_voltage(
     assert response.door3.voltage is None
 
 
+@pytest.mark.asyncio
+@respx.mock
+# pylint: disable=too-many-statements
+async def test_empty_apicode() -> None:
+    """Test open and close door."""
+    api: Final = ISmartGateApi("device1", "fakeuser", "fakepassword")
+    MockISmartGateServer(api, "")
+
+    # Initial info.
+    response: Final = await api.async_info()
+    assert response.door1.apicode == ""
+    assert response.door2.apicode == ""
+    assert response.door3.apicode == ""
+
+
 @pytest.mark.parametrize(
     ("api_generator", "server_generator"),
     ((GogoGate2Api, MockGogoGate2Server), (ISmartGateApi, MockISmartGateServer)),
